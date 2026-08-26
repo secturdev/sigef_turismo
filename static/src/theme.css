@@ -1,0 +1,64 @@
+@theme {
+  /*
+   * Paleta institucional SIGEF
+   * - primary   → verde
+   * - accent    → rojo
+   * - gold      → dorado
+   * - secondary → grises neutros
+   */
+  --color-primary-50: #e8f0ef;
+  --color-primary-100: #c5dbd8;
+  --color-primary-200: #8fb8b3;
+  --color-primary-300: #59958e;
+  --color-primary-400: #2d6f68;
+  --color-primary-500: #074f48;
+  --color-primary-600: #1e5b4f;
+  --color-primary-700: #002622;
+  --color-primary-800: #001c19;
+  --color-primary-900: #001311;
+  --color-accent-50: #fdf2f6;
+  --color-accent-100: #f8dce6;
+  --color-accent-200: #efb8ca;
+  --color-accent-300: #df8aa8;
+  --color-accent-400: #c4567d;
+  --color-accent-500: #ad3359;
+  --color-accent-600: #9b2247;
+  --color-accent-700: #7c1c39;
+  --color-accent-800: #5d152b;
+  --color-accent-900: #3e0f1d;
+  --color-gold-50: #faf6eb;
+  --color-gold-100: #f3e8cf;
+  --color-gold-200: #e6d19f;
+  --color-gold-300: #ddb868;
+  --color-gold-400: #c9a04e;
+  --color-gold-500: #a57f2c;
+  --color-gold-600: #8a6924;
+  --color-gold-700: #6f531d;
+  --color-gold-800: #543e16;
+  --color-gold-900: #3a2a0f;
+  --color-secondary-50: #f9fafb;
+  --color-secondary-100: #f3f4f6;
+  --color-secondary-200: #e5e7eb;
+  --color-secondary-300: #d1d5db;
+  --color-secondary-400: #9ca3af;
+  --color-secondary-500: #6b7280;
+  --color-secondary-600: #4b5563;
+  --color-secondary-700: #374151;
+  --color-secondary-800: #1f2937;
+  --color-secondary-900: #111827;
+
+  /*
+   * Sistema de diseño SIGEF
+   * - rounded-ui          → radio único
+   * - border-line         → borde en superficies claras
+   * - border-line-glass   → borde sobre imagen/color (slider, cards)
+   * - shadow-ui-media     → sombra de marcos con imagen (slider, cards)
+   */
+  --radius-ui: 1rem;
+  --color-line: #e5e7eb;
+  --color-line-glass: rgb(255 255 255 / 0.15);
+  --color-line-glass-strong: rgb(255 255 255 / 0.4);
+  --shadow-ui-media: 0 24px 48px -12px rgb(0 0 0 / 0.34), 0 12px 24px -8px rgb(0 0 0 / 0.22), 0 4px 8px -2px rgb(0 0 0 / 0.12);
+  /* Sombra sutil para superficies claras (login, paneles) */
+  --shadow-ui: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.08);
+}

@@ -1,0 +1,37 @@
+{% load static %}
+<section class="hero" id="hero" data-hero>
+  <div class="hero-ambient" data-hero-ambient></div>
+  <div class="hero-content shell">
+    {% include "landingpage/partials/_navbar.html" %}
+    <div class="pb-10 pt-4 sm:pb-16 sm:pt-6">
+      <div class="hero-frame">
+        <div class="swiper hero-swiper">
+          <div class="swiper-wrapper">
+            {% for slide in slides %}
+              <div class="swiper-slide" data-color="{{ slide.color }}">
+                <article class="hero-slide">
+                  <img src="{% static slide.image %}"
+                       alt="{{ slide.title }}"
+                       loading="{% if forloop.first %}eager{% else %}lazy{% endif %}" />
+                  <div class="hero-overlay">
+                    <div class="hero-copy">
+                      <h2 class="hero-title">{{ slide.title }}</h2>
+                      <p class="hero-subtitle">{{ slide.subtitle }}</p>
+                    </div>
+                    <div class="hero-actions">
+                      <a href="{{ slide.url|default:'#' }}" class="btn-accent">Ingresar al evento</a>
+                      <a href="{{ slide.info_url|default:'#' }}" class="btn-secondary">Ver más info</a>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="swiper-pagination"></div>
+          <button type="button" class="swiper-button-prev" aria-label="Anterior"></button>
+          <button type="button" class="swiper-button-next" aria-label="Siguiente"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

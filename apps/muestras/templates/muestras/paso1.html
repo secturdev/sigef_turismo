@@ -1,0 +1,88 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Solicitud — {{ evento_nombre }}{% endblock %}
+
+{% block content %}
+  {% include "muestras/_steps.html" with step=step %}
+  {% include "components/_page_header.html" with title="Solicitud de participación" subtitle=evento_nombre %}
+
+  <div class="doc-list">
+    {% if datos_globales %}
+      <section class="ui-panel">
+        <div class="doc-card__head">
+          <div>
+            <h2 class="panel-section__title">Expediente global</h2>
+            <p class="panel-section__lead">Datos que ya capturaste y se reutilizan en esta solicitud.</p>
+          </div>
+        </div>
+        <dl class="summary-list">
+          <div>
+            <dt>Tipo de persona</dt>
+            <dd>{{ datos_globales.tipo_persona }}</dd>
+          </div>
+          <div>
+            <dt>Nombre / razón social</dt>
+            <dd>{{ datos_globales.nombres }}</dd>
+          </div>
+          <div>
+            <dt>Número de celular</dt>
+            <dd>{{ datos_globales.telefono }}</dd>
+          </div>
+          <div>
+            <dt>Correo electrónico</dt>
+            <dd>{{ datos_globales.correo }}</dd>
+          </div>
+          <div>
+            <dt>CURP</dt>
+            <dd>{{ datos_globales.curp }}</dd>
+          </div>
+          {% if datos_globales.representante_legal and datos_globales.representante_legal != "—" %}
+          <div>
+            <dt>Representante legal</dt>
+            <dd>{{ datos_globales.representante_legal }}</dd>
+          </div>
+          {% endif %}
+        </dl>
+      </section>
+    {% endif %}
+
+    <section class="ui-panel">
+      <div class="doc-card__head">
+        <div>
+          <h2 class="panel-section__title">Datos del comercio</h2>
+          <p class="panel-section__lead">Información específica para tu participación en el evento.</p>
+        </div>
+      </div>
+
+      <form method="post" class="form-stack" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="ui-alert ui-alert--error">
+            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+
+        {% include "components/_form_field.html" with field=form.nombre_comercio %}
+        {% include "components/_form_field.html" with field=form.giro %}
+
+        <fieldset class="form-fieldset">
+          <legend class="form-label">{{ form.programa_especial.label }}</legend>
+          {% for radio in form.programa_especial %}
+            <label class="choice-card">
+              {{ radio.tag }}
+              <span>{{ radio.choice_label }}</span>
+            </label>
+          {% endfor %}
+          {% for error in form.programa_especial.errors %}
+            <p class="form-error">{{ error }}</p>
+          {% endfor %}
+        </fieldset>
+
+        <div class="form-actions form-actions--split">
+          <a href="{% url 'expediente:events' %}" class="btn-outline btn-lg">Volver a eventos</a>
+          <button type="submit" class="btn-primary btn-lg">Guardar y continuar</button>
+        </div>
+      </form>
+    </section>
+  </div>
+{% endblock content %}

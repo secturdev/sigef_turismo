@@ -1,0 +1,9 @@
+<div class="progress-block" aria-label="Avance del expediente">
+  <div class="progress-block__meta">
+    <span class="progress-block__label">Expediente</span>
+    <span class="progress-block__value">{{ percent }}% completo</span>
+  </div>
+  <div class="progress-track" role="progressbar" aria-valuenow="{{ percent }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="progress-fill" style="width: {{ percent }}%"></div>
+  </div>
+</div>

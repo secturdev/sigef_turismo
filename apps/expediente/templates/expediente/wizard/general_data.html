@@ -1,0 +1,21 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Datos generales{% endblock %}
+
+{% block content %}
+  {% include "components/_wizard_steps.html" with step=step %}
+  {% include "components/_page_header.html" with title="Datos generales" subtitle="Completa los datos requeridos según tu tipo de persona." %}
+
+  <section class="ui-panel">
+    <form method="post" class="form-stack" novalidate>
+      {% csrf_token %}
+      {% for field in form %}
+        {% include "components/_form_field.html" with field=field %}
+      {% endfor %}
+      <div class="form-actions form-actions--split">
+        <a href="{% url 'expediente:person_type' %}" class="btn-outline btn-lg">Atrás</a>
+        <button type="submit" class="btn-primary btn-lg">Guardar y continuar</button>
+      </div>
+    </form>
+  </section>
+{% endblock content %}

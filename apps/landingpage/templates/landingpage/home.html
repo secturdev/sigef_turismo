@@ -1,0 +1,24 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es-mx">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="keywords" content="SIGEF, ferias, festivales, exposiciones" />
+    <meta name="description"
+          content="Descubre y participa en ferias, festivales y exposiciones con SIGEF." />
+    <title>Eventos | SIGEF</title>
+    <link rel="stylesheet" href="{% static 'src/output.css' %}" />
+    <link rel="stylesheet"
+          href="{% static 'vendor/swiper/swiper-bundle.min.css' %}" />
+  </head>
+  <body class="landing">
+    <main>
+      {% include "landingpage/partials/_hero.html" %}
+      {% include "landingpage/partials/_event_cards.html" %}
+    </main>
+    {% include "landingpage/partials/_footer.html" %}
+    <script src="{% static 'vendor/swiper/swiper-bundle.min.js' %}"></script>
+    <script type="module" src="{% static 'js/landingpage/home.js' %}"></script>
+  </body>
+</html>

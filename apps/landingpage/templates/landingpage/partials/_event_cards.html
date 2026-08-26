@@ -1,0 +1,25 @@
+{% load static %}
+<section class="event-showcase" id="eventos" aria-labelledby="eventos-heading">
+  <div class="shell">
+    <header class="event-showcase-header">
+      <h2 id="eventos-heading" class="section-title">Próximos eventos</h2>
+    </header>
+    <div class="event-grid">
+      {% for card in event_cards %}
+        <article class="event-card group">
+          <div class="event-card-media">
+            <img src="{% static card.image %}" alt="{{ card.title }}" loading="lazy" />
+            <div class="event-card-overlay">
+              <h3 class="event-card-title">{{ card.title }}</h3>
+              {% if card.disponible %}
+                <a href="{{ card.register_url }}" class="btn-accent event-card-btn">Registrarme</a>
+              {% else %}
+                <span class="btn event-card-btn cursor-not-allowed bg-white/20 text-white/70">No disponible</span>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>

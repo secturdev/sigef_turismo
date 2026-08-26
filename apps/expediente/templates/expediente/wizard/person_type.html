@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Tipo de persona{% endblock %}
+
+{% block content %}
+  {% include "components/_wizard_steps.html" with step=step %}
+  {% include "components/_page_header.html" with title="Tipo de persona" subtitle="Elige la opción que mejor te describe." %}
+
+  <section class="ui-panel">
+    <form method="post" class="form-stack" novalidate>
+      {% csrf_token %}
+      <fieldset class="form-fieldset">
+        <legend class="form-label">Tipo de persona</legend>
+        {% for radio in form.tipo_persona %}
+          <label class="choice-card">
+            {{ radio.tag }}
+            <span>{{ radio.choice_label }}</span>
+          </label>
+        {% endfor %}
+        {% for error in form.tipo_persona.errors %}
+          <p class="form-error">{{ error }}</p>
+        {% endfor %}
+      </fieldset>
+      <div class="form-actions">
+        <button type="submit" class="btn-primary btn-lg">Guardar y continuar</button>
+      </div>
+    </form>
+  </section>
+{% endblock content %}

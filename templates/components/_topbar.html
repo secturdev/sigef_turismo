@@ -1,0 +1,14 @@
+<header class="app-topbar">
+  <button type="button"
+          class="app-topbar__menu"
+          @click="sidebarOpen = !sidebarOpen"
+          aria-label="Abrir menú">
+    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+    </svg>
+    <span>Menú</span>
+  </button>
+  <div class="app-topbar__title">
+    {% block topbar_title %}{% endblock %}
+  </div>
+</header>

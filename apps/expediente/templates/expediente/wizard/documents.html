@@ -1,0 +1,60 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Documentos{% endblock %}
+
+{% block content %}
+  {% include "components/_wizard_steps.html" with step=step %}
+  {% include "components/_page_header.html" with title="Documentos" subtitle="Carga en PDF los documentos requeridos para tu tipo de persona." %}
+
+  <div class="doc-list">
+    {% for item in progress.documentos %}
+      <section class="ui-panel doc-card">
+        <div class="doc-card__head">
+          <h2 class="doc-card__title">{{ item.tipo.nombre }}</h2>
+          {% if item.cargado %}
+            <span class="badge badge--{{ item.estado|lower }}">{{ item.estado }}</span>
+          {% else %}
+            <span class="badge badge--pending">Pendiente</span>
+          {% endif %}
+        </div>
+
+        {% if item.version %}
+          <p class="doc-card__meta">
+            Archivo actual:
+            <a href="{% url 'expediente:download_version' item.version.pk %}">
+              {{ item.version.nombre_original }}
+            </a>
+          </p>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="form-stack form-stack--tight">
+          {% csrf_token %}
+          <input type="hidden" name="tipo_documento_id" value="{{ item.tipo.pk }}" />
+          {% if error_tipo_id == item.tipo.pk %}
+            {% include "components/_form_field.html" with field=upload_form.archivo %}
+            {% include "components/_form_field.html" with field=upload_form.fecha_emision %}
+            {% include "components/_form_field.html" with field=upload_form.fecha_vencimiento %}
+          {% else %}
+            {% with form=upload_form %}
+              {% include "components/_form_field.html" with field=form.archivo %}
+              {% include "components/_form_field.html" with field=form.fecha_emision %}
+              {% include "components/_form_field.html" with field=form.fecha_vencimiento %}
+            {% endwith %}
+          {% endif %}
+          <button type="submit" class="btn-primary btn-lg">
+            {% if item.cargado %}Actualizar documento{% else %}Subir documento{% endif %}
+          </button>
+        </form>
+      </section>
+    {% empty %}
+      <section class="ui-panel">
+        <p>No hay tipos de documento configurados. Ejecuta el comando <code>seed_expediente</code>.</p>
+      </section>
+    {% endfor %}
+  </div>
+
+  <div class="form-actions form-actions--split mt-6">
+    <a href="{% url 'expediente:general_data' %}" class="btn-outline btn-lg">Atrás</a>
+    <a href="{% url 'expediente:dashboard' %}" class="btn-primary btn-lg">Ir al inicio</a>
+  </div>
+{% endblock content %}

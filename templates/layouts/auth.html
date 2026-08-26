@@ -1,0 +1,28 @@
+{% extends "_base.html" %}
+{% load static %}
+
+{% block body %}
+  <div class="auth-shell">
+    <main class="auth-main">
+      <section class="auth-panel">
+        <div class="auth-card">
+          {% include "components/_messages.html" %}
+          {% block content %}{% endblock content %}
+        </div>
+      </section>
+
+      <aside class="auth-visual" aria-hidden="false">
+        <div class="auth-pattern"
+             style="--auth-pattern: url('{% static 'img/auth/patron-izquierda.png' %}')"></div>
+        <img src="{% static 'img/brand/sigef-logo.png' %}"
+             alt="SIGEF — Sistema Integral de Gestión de Eventos y Festivales"
+             class="auth-brand__logo"
+             width="360"
+             height="100"
+             decoding="async" />
+      </aside>
+    </main>
+
+    {% include "components/_auth_footer.html" %}
+  </div>
+{% endblock body %}

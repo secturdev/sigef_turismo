@@ -1,0 +1,57 @@
+{% load static %}
+<nav class="site-nav" aria-label="Navegación principal">
+  <a href="{% url 'home' %}" class="brand">
+    SIG<span class="brand-accent">EF</span>
+  </a>
+  {% if not ocultar_buscador %}
+  <div class="hidden flex-1 justify-center px-6 md:flex">
+    <form role="search" class="nav-search max-w-md" action="#" method="get">
+      <svg class="h-4 w-4 shrink-0 text-white/70"
+           xmlns="http://www.w3.org/2000/svg"
+           fill="none"
+           viewBox="0 0 24 24"
+           stroke-width="1.5"
+           stroke="currentColor"
+           aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+      </svg>
+      <label for="site-search" class="sr-only">Buscar eventos</label>
+      <input id="site-search"
+             type="search"
+             name="q"
+             placeholder="Buscar eventos, ferias o festivales..."
+             autocomplete="off" />
+    </form>
+  </div>
+  {% endif %}
+  <div class="flex items-center gap-1 sm:gap-2">
+    <a href="{% url 'home' %}#eventos" class="nav-link">
+      <svg class="h-4 w-4"
+           xmlns="http://www.w3.org/2000/svg"
+           fill="none"
+           viewBox="0 0 24 24"
+           stroke-width="1.5"
+           stroke="currentColor"
+           aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+      </svg>
+      <span class="hidden sm:inline">Eventos</span>
+    </a>
+    <a href="{% url 'autenticacion:login' %}" class="nav-link">
+      <svg class="h-4 w-4"
+           xmlns="http://www.w3.org/2000/svg"
+           fill="none"
+           viewBox="0 0 24 24"
+           stroke-width="1.5"
+           stroke="currentColor"
+           aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+      </svg>
+      <span class="hidden sm:inline">Iniciar sesión</span>
+    </a>
+    <div class="nav-lang" role="group" aria-label="Idioma">
+      <button type="button" aria-pressed="true">ES</button>
+      <button type="button" aria-pressed="false">EN</button>
+    </div>
+  </div>
+</nav>

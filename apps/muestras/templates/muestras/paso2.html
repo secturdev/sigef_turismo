@@ -1,0 +1,71 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Documentos — {{ evento_nombre }}{% endblock %}
+
+{% block content %}
+  {% include "muestras/_steps.html" with step=step %}
+  {% include "components/_page_header.html" with title="Documentos del comercio" subtitle=evento_nombre %}
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="ui-alert ui-alert--error mb-5">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="doc-list">
+      <section class="ui-panel doc-card">
+        <div class="doc-card__head">
+          <h2 class="doc-card__title">Logo del comercio</h2>
+          {% if solicitud.logo %}
+            <span class="badge badge--vigente">Cargado</span>
+          {% else %}
+            <span class="badge badge--pending">Pendiente</span>
+          {% endif %}
+        </div>
+        {% if solicitud.logo %}
+          <p class="doc-card__meta">
+            Archivo actual:
+            <a href="{{ solicitud.logo.url }}" target="_blank" rel="noopener">
+              ver logo
+            </a>
+          </p>
+        {% endif %}
+        <div class="form-stack form-stack--tight">
+          {% include "components/_form_field.html" with field=form.logo %}
+        </div>
+      </section>
+
+      <section class="ui-panel doc-card">
+        <div class="doc-card__head">
+          <h2 class="doc-card__title">Imágenes del comercio</h2>
+          {% if solicitud.imagenes.exists %}
+            <span class="badge badge--vigente">Cargadas</span>
+          {% else %}
+            <span class="badge badge--pending">Pendiente</span>
+          {% endif %}
+        </div>
+        {% if solicitud.imagenes.exists %}
+          <ul class="doc-card__meta mb-4 list-none space-y-2 p-0">
+            {% for img in solicitud.imagenes.all %}
+              <li>
+                <a href="{{ img.archivo.url }}" class="font-semibold text-primary-700 hover:underline" target="_blank" rel="noopener">
+                  {{ img.nombre_original }}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <div class="form-stack form-stack--tight">
+          {% include "components/_form_field.html" with field=form.imagenes %}
+        </div>
+      </section>
+    </div>
+
+    <div class="form-actions form-actions--split mt-6">
+      <a href="{% url 'muestras:paso1' %}" class="btn-outline btn-lg">Atrás</a>
+      <button type="submit" class="btn-primary btn-lg">Finalizar solicitud</button>
+    </div>
+  </form>
+{% endblock content %}
