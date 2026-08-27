@@ -152,6 +152,9 @@ OIDC_STORE_ID_TOKEN = True
 OIDC_CREATE_USER = True
 # Tolerancia de reloj OIDC (iat).
 OIDC_CLOCK_SKEW = env.int("OIDC_CLOCK_SKEW", default=120)
+# Diagnóstico de atributos recibidos desde Llave Tabasco. Se habilita por defecto
+# únicamente en desarrollo; puede controlarse con OIDC_LOG_CLAIMS=true/false.
+OIDC_LOG_CLAIMS = env.bool("OIDC_LOG_CLAIMS", default=env_name == "dev")
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",

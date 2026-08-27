@@ -95,6 +95,7 @@ class GeneralDataView(LoginRequiredMixin, FormView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["tipo_persona"] = self.expediente.tipo_persona
+        kwargs["identidad_oidc"] = bool(self.request.user.oidc_sub)
         return kwargs
 
     def get_initial(self):

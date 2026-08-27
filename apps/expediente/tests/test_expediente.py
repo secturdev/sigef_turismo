@@ -16,6 +16,7 @@ from apps.expediente.models import (
     ValorCampoAdicional,
     VersionDocumento,
 )
+from apps.expediente.forms import GeneralDataForm
 from apps.expediente.services import (
     ESTADO_VENCIDO,
     ESTADO_VIGENTE,
@@ -128,6 +129,31 @@ class ExpedienteRulesTests(TestCase):
         self.assertEqual(validate_rfc("ede800101abc"), "EDE800101ABC")
         with self.assertRaises(ValidationError):
             validate_rfc("XX")
+
+    def test_oidc_identity_fields_ignore_posted_changes(self):
+        form = GeneralDataForm(
+            data={
+                "nombres": "NOMBRE ALTERADO",
+                "apellido_paterno": "APELLIDO ALTERADO",
+                "apellido_materno": "OTRO",
+                "curp": "PELJ800101HDFRRN09",
+                "telefono": "9931234567",
+                "correo_contacto": "alterado@example.com",
+            },
+            initial={
+                "nombres": "SANTIAGO",
+                "apellido_paterno": "REAL",
+                "apellido_materno": "CALCANEO",
+                "correo_contacto": "original@example.com",
+            },
+            tipo_persona=Expediente.TipoPersona.CIUDADANO,
+            identidad_oidc=True,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["nombres"], "SANTIAGO")
+        self.assertEqual(form.cleaned_data["apellido_paterno"], "REAL")
+        self.assertEqual(form.cleaned_data["apellido_materno"], "CALCANEO")
+        self.assertEqual(form.cleaned_data["correo_contacto"], "original@example.com")
 
 
 class AdditionalFieldsTests(TestCase):

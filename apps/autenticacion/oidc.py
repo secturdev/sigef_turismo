@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from urllib.parse import urlencode
 
 import jwt
@@ -10,8 +11,45 @@ from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from mozilla_django_oidc.utils import absolutify
 
 from apps.expediente.services import get_or_create_expediente
+from apps.expediente.models import DatosGenerales
 
 from .models import Usuario
+
+logger = logging.getLogger(__name__)
+
+
+def _log_oidc_claims(claims) -> None:
+    """Registra atributos OIDC para diagnóstico sin exponer tokens o secretos."""
+    if not settings.OIDC_LOG_CLAIMS:
+        return
+
+    sensitive_fragments = ("token", "secret", "password", "credential")
+    safe_claims = {
+        key: value
+        for key, value in claims.items()
+        if not any(fragment in key.lower() for fragment in sensitive_fragments)
+    }
+    logger.warning("Llave Tabasco OIDC claims recibidos: %s", safe_claims)
+    logger.warning("Lo que tiene: %s", claims)
+
+
+def _sync_expediente_identity(user, claims) -> None:
+    """Copia al expediente los atributos de identidad administrados por OIDC."""
+    expediente = get_or_create_expediente(user)
+    datos, _ = DatosGenerales.objects.get_or_create(expediente=expediente)
+    claim_fields = {
+        "nombres": (claims.get("given_name") or "").strip(),
+        "apellido_paterno": (claims.get("family_name") or "").strip(),
+        "apellido_materno": (claims.get("apellido_materno") or "").strip(),
+        "correo_contacto": (claims.get("email") or "").strip().lower(),
+    }
+    changed_fields = []
+    for field, value in claim_fields.items():
+        if value and getattr(datos, field) != value:
+            setattr(datos, field, value)
+            changed_fields.append(field)
+    if changed_fields:
+        datos.save(update_fields=[*changed_fields, "fecha_actualizacion"])
 
 
 def provider_logout(request) -> str:
@@ -56,6 +94,7 @@ class LlaveTabascoOIDCBackend(OIDCAuthenticationBackend):
             raise SuspiciousOperation("JWS token verification failed.") from exc
 
     def filter_users_by_claims(self, claims):
+        _log_oidc_claims(claims)
         sub = claims.get("sub")
         if not sub:
             return Usuario.objects.none()
@@ -77,7 +116,7 @@ class LlaveTabascoOIDCBackend(OIDCAuthenticationBackend):
         )
         user.set_unusable_password()
         user.save()
-        get_or_create_expediente(user)
+        _sync_expediente_identity(user, claims)
         return user
 
     def update_user(self, user, claims):
@@ -85,4 +124,5 @@ class LlaveTabascoOIDCBackend(OIDCAuthenticationBackend):
         if name and user.nombre_visible != name[:150]:
             user.nombre_visible = name[:150]
             user.save(update_fields=["nombre_visible"])
+        _sync_expediente_identity(user, claims)
         return user

@@ -37,7 +37,9 @@ class GeneralDataForm(forms.Form):
         required=False,
     )
 
-    def __init__(self, *args, tipo_persona: str = "", **kwargs):
+    def __init__(
+        self, *args, tipo_persona: str = "", identidad_oidc: bool = False, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.tipo_persona = tipo_persona
         self.campos_adicionales = list(
@@ -68,6 +70,19 @@ class GeneralDataForm(forms.Form):
                 required=campo.obligatorio,
                 max_length=255,
             )
+
+        if identidad_oidc:
+            for field_name in (
+                "nombres",
+                "apellido_paterno",
+                "apellido_materno",
+                "correo_contacto",
+            ):
+                if field_name in self.fields:
+                    self.fields[field_name].disabled = True
+                    self.fields[field_name].help_text = (
+                        "Dato proporcionado por Llave Tabasco; no se puede editar."
+                    )
 
         _style_fields(self)
 
