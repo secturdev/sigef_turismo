@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from urllib.parse import urlencode
 
@@ -23,18 +24,20 @@ def _log_oidc_claims(claims) -> None:
     if not settings.OIDC_LOG_CLAIMS:
         return
 
-    sensitive_fragments = ("token", "secret", "password", "credential")
-    safe_claims = {
-        key: value
-        for key, value in claims.items()
-        if not any(fragment in key.lower() for fragment in sensitive_fragments)
-    }
-    logger.warning("Llave Tabasco OIDC claims recibidos: %s", safe_claims)
-    logger.warning("Lo que tiene: %s", claims)
-
+    payload_json = json.dumps(
+        claims,
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+        default=str,
+    )
+    logger.warning("Llave Tabasco - JSON completo del token:\n%s", payload_json)
+    
+    logger.warning("Llave Tabasco - JSON completo del token:\n%s", claims)
 
 def _sync_expediente_identity(user, claims) -> None:
     """Copia al expediente los atributos de identidad administrados por OIDC."""
+    # logger.warning("Usuari",user)
     expediente = get_or_create_expediente(user)
     datos, _ = DatosGenerales.objects.get_or_create(expediente=expediente)
     claim_fields = {
@@ -121,8 +124,27 @@ class LlaveTabascoOIDCBackend(OIDCAuthenticationBackend):
 
     def update_user(self, user, claims):
         name = (claims.get("name") or "").strip()
+        email = (claims.get("email") or "").strip().lower()
+        changed_fields = []
+
         if name and user.nombre_visible != name[:150]:
             user.nombre_visible = name[:150]
-            user.save(update_fields=["nombre_visible"])
+            changed_fields.append("nombre_visible")
+
+        if email and user.correo != email:
+            email_in_use = Usuario.objects.exclude(pk=user.pk).filter(correo=email).exists()
+            if email_in_use:
+                logger.warning(
+                    "Llave Tabasco no pudo actualizar el correo de sub %s: "
+                    "el correo %s ya pertenece a otro usuario.",
+                    claims.get("sub"),
+                    email,
+                )
+            else:
+                user.correo = email
+                changed_fields.append("correo")
+
+        if changed_fields:
+            user.save(update_fields=changed_fields)
         _sync_expediente_identity(user, claims)
         return user

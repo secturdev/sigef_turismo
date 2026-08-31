@@ -2,11 +2,27 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from apps.autenticacion.models import Usuario
-from apps.autenticacion.oidc import LlaveTabascoOIDCBackend
+from apps.autenticacion.oidc import LlaveTabascoOIDCBackend, _log_oidc_claims
 from apps.expediente.models import DatosGenerales
 
 
 class AuthTests(TestCase):
+    def test_oidc_claims_are_logged_as_complete_json(self):
+        claims = {
+            "sub": "llave-123",
+            "name": "SANTIAGO REAL",
+            "custom_claim": {"roles": ["ciudadano"]},
+        }
+
+        with self.settings(OIDC_LOG_CLAIMS=True):
+            with self.assertLogs("apps.autenticacion.oidc", level="WARNING") as logs:
+                _log_oidc_claims(claims)
+
+        output = "\n".join(logs.output)
+        self.assertIn('"custom_claim": {', output)
+        self.assertIn('"roles": [', output)
+        self.assertIn('"sub": "llave-123"', output)
+
     def test_register_and_login_with_email(self):
         client = Client()
         reg = client.post(
@@ -47,3 +63,21 @@ class AuthTests(TestCase):
         self.assertEqual(datos.apellido_paterno, "REAL")
         self.assertEqual(datos.apellido_materno, "CALCANEO")
         self.assertEqual(datos.correo_contacto, claims["email"])
+
+    def test_oidc_login_replaces_provisional_email_with_claim_email(self):
+        user = Usuario.objects.create(
+            correo="llave-123@llave-tabasco.local",
+            oidc_sub="llave-123",
+            nombre_visible="Nombre anterior",
+        )
+        claims = {
+            "sub": "llave-123",
+            "name": "SANTIAGO REAL",
+            "email": "realcalcaneosantiago@gmail.com",
+        }
+
+        LlaveTabascoOIDCBackend().update_user(user, claims)
+
+        user.refresh_from_db()
+        self.assertEqual(user.correo, claims["email"])
+        self.assertEqual(user.nombre_visible, claims["name"])
