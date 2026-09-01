@@ -173,7 +173,7 @@ class ProductForm(forms.ModelForm):
 class FurnitureForm(forms.ModelForm):
     class Meta:
         model = Mobiliario
-        fields = ("nombre", "imagen", "factura", "descripcion")
+        fields = ("nombre", "tipo", "imagen", "factura", "descripcion")
         widgets = {
             "imagen": forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
             "factura": forms.ClearableFileInput(attrs={"accept": "application/pdf,.pdf"}),

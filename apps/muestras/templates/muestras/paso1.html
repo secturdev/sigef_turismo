@@ -1,8 +1,22 @@
 {% extends "layouts/app.html" %}
+{% load static %}
 
 {% block title %}Solicitud — {{ evento_nombre }}{% endblock %}
 
 {% block content %}
+  <section class="participation-event" aria-labelledby="participation-event-title">
+    <div class="participation-event__media">
+      <img src="{% static evento_info.imagen %}" alt="{{ evento_info.nombre }}" loading="eager" decoding="async" />
+    </div>
+    <div class="participation-event__content">
+      <span class="participation-event__status">{{ evento_info.estado }}</span>
+      <p class="participation-event__eyebrow">Solicitud de participación para</p>
+      <h1 id="participation-event-title">{{ evento_info.nombre }}</h1>
+      <p class="participation-event__description">{{ evento_info.descripcion }}</p>
+      <a href="{% url 'expediente:events' %}" class="participation-event__change">Ver otros eventos</a>
+    </div>
+  </section>
+
   {% include "muestras/_steps.html" with step=step %}
   {% include "components/_page_header.html" with title="Solicitud de participación" subtitle=evento_nombre %}
 
@@ -20,28 +34,12 @@
             <dt>Tipo de persona</dt>
             <dd>{{ datos_globales.tipo_persona }}</dd>
           </div>
+          {% for label, value in datos_globales.campos %}
           <div>
-            <dt>Nombre / razón social</dt>
-            <dd>{{ datos_globales.nombres }}</dd>
+            <dt>{{ label }}</dt>
+            <dd>{{ value }}</dd>
           </div>
-          <div>
-            <dt>Número de celular</dt>
-            <dd>{{ datos_globales.telefono }}</dd>
-          </div>
-          <div>
-            <dt>Correo electrónico</dt>
-            <dd>{{ datos_globales.correo }}</dd>
-          </div>
-          <div>
-            <dt>CURP</dt>
-            <dd>{{ datos_globales.curp }}</dd>
-          </div>
-          {% if datos_globales.representante_legal and datos_globales.representante_legal != "—" %}
-          <div>
-            <dt>Representante legal</dt>
-            <dd>{{ datos_globales.representante_legal }}</dd>
-          </div>
-          {% endif %}
+          {% endfor %}
         </dl>
       </section>
     {% endif %}
@@ -49,8 +47,8 @@
     <section class="ui-panel">
       <div class="doc-card__head">
         <div>
-          <h2 class="panel-section__title">Datos del comercio</h2>
-          <p class="panel-section__lead">Información específica para tu participación en el evento.</p>
+          <h2 class="panel-section__title">Participación del comercio</h2>
+          <p class="panel-section__lead">Selecciona los elementos de tu catálogo que llevarás al evento.</p>
         </div>
       </div>
 
@@ -62,7 +60,18 @@
           </div>
         {% endif %}
 
-        {% include "components/_form_field.html" with field=form.nombre_comercio %}
+        {% if comercio %}
+          <div class="application-commerce">
+            <img src="{% url 'expediente:commerce_logo' %}" alt="Logo de {{ comercio.nombre }}" />
+            <div><span>Comercio registrado</span><strong>{{ comercio.nombre }}</strong></div>
+          </div>
+        {% else %}
+          <div class="ui-alert ui-alert--warning">
+            Registra primero el nombre y logo de tu comercio en
+            <a href="{% url 'expediente:profile' %}?tab=comercio">Mi perfil</a>.
+          </div>
+        {% endif %}
+
         {% include "components/_form_field.html" with field=form.giro %}
 
         <fieldset class="form-fieldset">
@@ -76,6 +85,72 @@
           {% for error in form.programa_especial.errors %}
             <p class="form-error">{{ error }}</p>
           {% endfor %}
+        </fieldset>
+
+        {% if evento_info.categoria == "FERIA" %}
+          <fieldset class="event-requirements">
+            <legend>Equipamiento obligatorio para feria</legend>
+            <p>Indica las cantidades que tendrás disponibles durante todo el evento.</p>
+            <div class="event-requirements__grid">
+              <div class="requirement-card">
+                <div class="requirement-card__icon" aria-hidden="true">♻</div>
+                {% include "components/_form_field.html" with field=form.cantidad_botes_basura %}
+                <span>Obligatorio: mínimo 1</span>
+              </div>
+              <div class="requirement-card">
+                <div class="requirement-card__icon" aria-hidden="true">🧯</div>
+                {% include "components/_form_field.html" with field=form.cantidad_extintores %}
+                <span>Obligatorio: mínimo 1</span>
+              </div>
+            </div>
+          </fieldset>
+        {% endif %}
+
+        <fieldset class="catalog-selection">
+          <legend>Productos que participarán</legend>
+          <p>Selecciona al menos un producto de tu catálogo.</p>
+          <div class="participation-items">
+            {% for row in form.product_rows %}
+              <div class="participation-item">
+                <label class="participation-item__select">
+                  {{ row.select }}
+                  <img src="{% url 'expediente:product_image' row.item.pk %}" alt="" />
+                  <span><strong>{{ row.item.nombre }}</strong><small>{% if row.item.factura %}Factura disponible en catálogo{% else %}Sin factura en catálogo · puedes agregarla aquí{% endif %}</small></span>
+                  <em>Seleccionar</em>
+                </label>
+                <div class="participation-item__fields">
+                  {% include "components/_form_field.html" with field=row.stock %}
+                  {% include "components/_form_field.html" with field=row.price %}
+                  {% if row.invoice %}{% include "components/_form_field.html" with field=row.invoice %}{% endif %}
+                </div>
+              </div>
+            {% empty %}
+            <a href="{% url 'expediente:profile' %}?tab=products" class="catalog-selection__empty">Registrar productos en Mi perfil</a>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <fieldset class="catalog-selection">
+          <legend>Mobiliario que utilizarás</legend>
+          <p>Opcional. Marca el mobiliario que necesitarás durante tu participación.</p>
+          <div class="participation-items">
+            {% for row in form.furniture_rows %}
+              <div class="participation-item">
+                <label class="participation-item__select">
+                  {{ row.select }}
+                  <img src="{% url 'expediente:furniture_file' row.item.pk 'imagen' %}" alt="" />
+                  <span><strong>{{ row.item.nombre }}</strong><small>{{ row.item.get_tipo_display }} · {% if row.item.factura %}factura disponible{% else %}sin factura en catálogo{% endif %}</small></span>
+                  <em>Seleccionar</em>
+                </label>
+                <div class="participation-item__fields participation-item__fields--furniture">
+                  {% include "components/_form_field.html" with field=row.quantity %}
+                  {% if row.invoice %}{% include "components/_form_field.html" with field=row.invoice %}{% endif %}
+                </div>
+              </div>
+            {% empty %}
+            <a href="{% url 'expediente:profile' %}?tab=mobiliario" class="catalog-selection__empty">Registrar mobiliario en Mi perfil</a>
+            {% endfor %}
+          </div>
         </fieldset>
 
         <div class="form-actions form-actions--split">

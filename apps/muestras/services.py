@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
-from .models import ImagenComercio, SolicitudMuestra
+from .models import ImagenComercio, MobiliarioSolicitud, ProductoSolicitud, SolicitudMuestra
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -25,18 +25,48 @@ def _validate_image(uploaded: UploadedFile) -> None:
         raise ValidationError("Cada imagen no puede superar 5 MB.")
 
 
-def guardar_paso1(solicitud: SolicitudMuestra, data: dict) -> SolicitudMuestra:
-    solicitud.nombre_comercio = (data.get("nombre_comercio") or "").strip()
+@transaction.atomic
+def guardar_paso1(
+    solicitud: SolicitudMuestra,
+    data: dict,
+    *,
+    nombre_comercio: str,
+    productos: list[dict],
+    mobiliario: list[dict],
+) -> SolicitudMuestra:
+    solicitud.nombre_comercio = (nombre_comercio or "").strip()
     solicitud.giro = data.get("giro") or ""
     solicitud.programa_especial = data.get("programa_especial") or ""
+    solicitud.cantidad_botes_basura = data.get("cantidad_botes_basura") or 0
+    solicitud.cantidad_extintores = data.get("cantidad_extintores") or 0
     if not solicitud.nombre_comercio:
         raise ValidationError({"nombre_comercio": "El nombre de comercio es obligatorio."})
     if not solicitud.giro:
         raise ValidationError({"giro": "Selecciona un giro."})
     if not solicitud.programa_especial:
         raise ValidationError({"programa_especial": "Selecciona un programa especial."})
+    if not productos:
+        raise ValidationError({"productos": "Selecciona al menos un producto."})
     solicitud.paso_actual = max(solicitud.paso_actual, 2)
     solicitud.save()
+    solicitud.productos.set([row["item"] for row in productos])
+    solicitud.mobiliario.set([row["item"] for row in mobiliario])
+    solicitud.detalle_productos.exclude(producto__in=[row["item"] for row in productos]).delete()
+    for row in productos:
+        defaults = {"stock_total": row["stock"], "precio_venta": row["price"]}
+        if row.get("invoice"):
+            defaults["factura"] = row["invoice"]
+        ProductoSolicitud.objects.update_or_create(
+            solicitud=solicitud, producto=row["item"], defaults=defaults
+        )
+    solicitud.detalle_mobiliario.exclude(mobiliario__in=[row["item"] for row in mobiliario]).delete()
+    for row in mobiliario:
+        defaults = {"cantidad": row["quantity"]}
+        if row.get("invoice"):
+            defaults["factura"] = row["invoice"]
+        MobiliarioSolicitud.objects.update_or_create(
+            solicitud=solicitud, mobiliario=row["item"], defaults=defaults
+        )
     return solicitud
 
 

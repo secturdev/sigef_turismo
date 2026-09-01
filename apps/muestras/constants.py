@@ -18,3 +18,14 @@ PROGRAMAS_ESPECIALES = [
 ]
 
 EVENTO_NOMBRE = "Festival del Chocolate"
+
+EVENTO_INFO = {
+    "nombre": EVENTO_NOMBRE,
+    "imagen": "img/others/CHOCOLATE.png",
+    "descripcion": (
+        "Participa en el Festival del Chocolate y presenta tu comercio, "
+        "productos y propuesta ante visitantes y expositores."
+    ),
+    "estado": "Convocatoria disponible",
+    "categoria": "FERIA",
+}

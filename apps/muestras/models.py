@@ -45,7 +45,15 @@ class SolicitudMuestra(models.Model):
         blank=True,
         null=True,
     )
+    productos = models.ManyToManyField(
+        "expediente.Producto", blank=True, related_name="solicitudes_muestra"
+    )
+    mobiliario = models.ManyToManyField(
+        "expediente.Mobiliario", blank=True, related_name="solicitudes_muestra"
+    )
     paso_actual = models.PositiveSmallIntegerField("paso actual", default=1)
+    cantidad_botes_basura = models.PositiveIntegerField("cantidad de botes de basura", default=0)
+    cantidad_extintores = models.PositiveIntegerField("cantidad de extintores", default=0)
     fecha_creacion = models.DateTimeField("fecha de creación", auto_now_add=True)
     fecha_actualizacion = models.DateTimeField("fecha de actualización", auto_now=True)
 
@@ -58,7 +66,12 @@ class SolicitudMuestra(models.Model):
 
     @property
     def paso1_completo(self) -> bool:
-        return bool(self.nombre_comercio and self.giro and self.programa_especial)
+        return bool(
+            self.nombre_comercio
+            and self.giro
+            and self.programa_especial
+            and self.productos.exists()
+        )
 
     @property
     def paso2_completo(self) -> bool:
@@ -83,3 +96,28 @@ class ImagenComercio(models.Model):
 
     def __str__(self) -> str:
         return self.nombre_original or f"Imagen #{self.pk}"
+
+
+class ProductoSolicitud(models.Model):
+    solicitud = models.ForeignKey(
+        SolicitudMuestra, on_delete=models.CASCADE, related_name="detalle_productos"
+    )
+    producto = models.ForeignKey("expediente.Producto", on_delete=models.PROTECT)
+    stock_total = models.PositiveIntegerField("cantidad de stock total")
+    precio_venta = models.DecimalField("precio de venta", max_digits=12, decimal_places=2)
+    factura = models.FileField("factura para el evento", upload_to="muestras/facturas/productos/", blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["solicitud", "producto"], name="producto_unico_por_solicitud")]
+
+
+class MobiliarioSolicitud(models.Model):
+    solicitud = models.ForeignKey(
+        SolicitudMuestra, on_delete=models.CASCADE, related_name="detalle_mobiliario"
+    )
+    mobiliario = models.ForeignKey("expediente.Mobiliario", on_delete=models.PROTECT)
+    cantidad = models.PositiveIntegerField("cantidad")
+    factura = models.FileField("factura para el evento", upload_to="muestras/facturas/mobiliario/", blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["solicitud", "mobiliario"], name="mobiliario_unico_por_solicitud")]

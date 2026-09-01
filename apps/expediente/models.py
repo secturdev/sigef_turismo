@@ -243,10 +243,16 @@ def _ruta_factura_mobiliario(instance: Mobiliario, filename: str) -> str:
 
 
 class Mobiliario(models.Model):
+    class Tipo(models.TextChoices):
+        GENERAL = "GENERAL", "General"
+        BOTE_BASURA = "BOTE_BASURA", "Bote de basura"
+        EXTINTOR = "EXTINTOR", "Extintor"
+
     expediente = models.ForeignKey(
         Expediente, on_delete=models.CASCADE, related_name="mobiliario"
     )
     nombre = models.CharField("nombre", max_length=150)
+    tipo = models.CharField("tipo", max_length=24, choices=Tipo.choices, default=Tipo.GENERAL)
     descripcion = models.TextField("descripción", max_length=1000)
     imagen = models.FileField(
         "imagen", upload_to=_ruta_imagen_mobiliario, storage=private_document_storage

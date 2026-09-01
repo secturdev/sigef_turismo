@@ -1,4 +1,4 @@
-{% extends "_base.html" %}
+<!-- {% extends "_base.html" %}
 {% load static %}
 
 {% block extra_css %}
@@ -18,4 +18,371 @@
       </main>
     </div>
   </div>
-{% endblock body %}
+{% endblock body %} -->
+<!-- <!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>15° Festival Chocolate — Nave 2 (3D)</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #eef0f4;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: absolute;
+      background: rgba(255, 255, 255, .93);
+      border: 1px solid #d8cfc4;
+      border-radius: 10px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+      z-index: 10;
+    }
+
+    #title {
+      top: 14px;
+      left: 14px;
+      padding: 12px 18px;
+    }
+
+    #title h1 {
+      margin: 0;
+      font-size: 20px;
+      color: #5b3a21;
+      letter-spacing: .5px;
+    }
+
+    #title p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #7a6a58;
+    }
+
+    #legend {
+      top: 14px;
+      right: 14px;
+      padding: 12px 16px;
+      width: 235px;
+    }
+
+    #legend h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #5b3a21;
+      border-bottom: 1px solid #e2d8cc;
+      padding-bottom: 6px;
+    }
+
+    .leg {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 7px 0;
+      font-size: 13px;
+      color: #4a3b2c;
+    }
+
+    .dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex: 0 0 26px;
+      color: #fff;
+    }
+
+    #hint {
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #6b5a48;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="title" class="panel">
+    <h1>🍫 15° FESTIVAL CHOCOLATE</h1>
+    <p>Mapa de visitantes — Nave 2 · Vista 3D interactiva</p>
+  </div>
+
+  <div id="legend" class="panel">
+    <h2>Leyenda</h2>
+    <div class="leg"><span class="dot" style="background:#8a6642">☕</span>Chocolaterías y Bebidas</div>
+    <div class="leg"><span class="dot" style="background:#7da05f">🌳</span>Cavacao</div>
+    <div class="leg"><span class="dot" style="background:#8a8a4f">🏪</span>Área General Expositores</div>
+    <div class="leg"><span class="dot" style="background:#3a2417">🛋️</span>Salón Chocolate</div>
+    <div class="leg"><span class="dot" style="background:#e09b3d">🌴</span>Haciendas</div>
+    <div class="leg"><span class="dot" style="background:#b0447c">🍷</span>Área de Catas</div>
+    <div class="leg"><span class="dot" style="background:#5b3a21">?</span>Punto de Información / Turismo</div>
+  </div>
+
+  <div id="hint" class="panel">🖱️ Arrastra: rotar · Rueda: zoom · Click derecho: desplazar</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    /* ============ ESCENA BÁSICA ============ */
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xeef0f4);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 600);
+    camera.position.set(42, 60, 98);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.getElementById('app').appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(40, 0, 36);
+    controls.enableDamping = true; controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.minDistance = 15; controls.maxDistance = 220;
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xcbc4ba, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff2e0, 0.9);
+    sun.position.set(70, 90, 5);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 10, far: 250 });
+    scene.add(sun); scene.add(sun.target);
+    sun.target.position.set(40, 0, 35);
+
+    /* ============ SUELO Y PISO PRINCIPAL ============ */
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500),
+      new THREE.MeshStandardMaterial({ color: 0xe3e1de, roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2; ground.position.set(40, -0.05, 34);
+    ground.receiveShadow = true; scene.add(ground);
+
+    // Contorno de la nave (con la "V" de la entrada)
+    const pts = [[2, 16], [79, 16], [79, 52], [52, 52], [40, 64], [28, 52], [16, 52], [16, 55], [2, 55]];
+    const shp = new THREE.Shape();
+    shp.moveTo(pts[0][0], -pts[0][1]);
+    for (let i = 1; i < pts.length; i++) shp.lineTo(pts[i][0], -pts[i][1]);
+    shp.closePath();
+    const floor = new THREE.Mesh(new THREE.ShapeGeometry(shp),
+      new THREE.MeshStandardMaterial({ color: 0xf7f5f1, roughness: .96 }));
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+    function zone(x1, z1, x2, z2, color, y = 0.02) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(x2 - x1, z2 - z1),
+        new THREE.MeshStandardMaterial({ color, roughness: .95 }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set((x1 + x2) / 2, y, (z1 + z2) / 2);
+      m.receiveShadow = true; scene.add(m);
+    }
+    zone(2, 16.5, 15, 31, 0x3a2417);           // Salón Chocolate
+    zone(2, 31, 15, 38.5, 0xd9c7a4);           // Desarrollo Comercial
+    zone(2, 38.5, 15.5, 54.5, 0xe39ec6);          // Catas
+    zone(15.5, 16, 58, 21, 0xdedee2);           // franja servicios
+    zone(59.5, 17.5, 77.5, 39.5, 0x9fbe7a);       // Cavacao
+    zone(59, 41, 78, 52, 0xd2a678);           // Chocolaterías Bebidas
+
+    /* ============ MUROS ============ */
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: .9 });
+    function wall(x1, z1, x2, z2, h = 2.4, t = 0.5) {
+      const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(len, h, t), wallMat);
+      m.position.set((x1 + x2) / 2, h / 2, (z1 + z2) / 2);
+      m.rotation.y = Math.atan2(-dz, dx);
+      m.castShadow = true; m.receiveShadow = true; scene.add(m);
+    }
+    // Perímetro
+    wall(2, 16, 79, 16); wall(79, 16, 79, 52); wall(79, 52, 52, 52);
+    wall(52, 52, 40, 64); wall(40, 64, 28, 52); wall(28, 52, 16, 52);
+    wall(16, 52, 16, 55); wall(16, 55, 2, 55); wall(2, 55, 2, 16);
+    // Internos
+    wall(15.5, 21, 30, 21, 2.0); wall(33, 21, 58.5, 21, 2.0);   // franja servicios / hall
+    wall(59.3, 17.5, 59.3, 39.5, 2.0);                      // hall / Cavacao
+    wall(59.3, 41, 59.3, 46, 2.0);                          // hall / cafetería BR
+    wall(16, 46, 32, 46, 2.0); wall(48, 46, 59.3, 46, 2.0);     // borde sur del hall (deja la entrada)
+    wall(15.5, 17, 15.5, 30.5, 1.2);                        // separación Salón Chocolate
+
+    /* ============ MOBILIARIO / STANDS ============ */
+    const boothCols = [0x8a6642, 0x7a5636, 0x9c7a54, 0x6f4e2e, 0x957247];
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x6b5236, roughness: .9 });
+    function booth(x, z, w = 1.7, d = 1.3, h) {
+      h = h || (0.9 + Math.random() * 0.5);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+        new THREE.MeshStandardMaterial({ color: boothCols[(Math.random() * boothCols.length) | 0], roughness: .85 }));
+      m.position.set(x, h / 2, z); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.06, d + 0.3), baseMat);
+      b.position.set(x, 0.03, z); b.receiveShadow = true; scene.add(b);
+    }
+    // Stands del hall central (Chocolaterías y Bebidas)
+    [[19, 24], [25, 24], [32, 24], [38, 24], [44, 24],
+    [22, 29], [28, 29], [34, 29], [40, 29],
+    [19, 34.5], [25, 34.5], [31, 34.5], [37, 34.5], [43, 34.5],
+    [21, 40], [27, 40], [33, 40], [39, 40]].forEach(([cx, cz]) => { booth(cx - 1.05, cz); booth(cx + 1.05, cz); });
+    for (let z = 23.5; z <= 44; z += 2.4) booth(57.4, z, 1.1, 1.7);   // columna este
+    [26, 31, 36].forEach(z => booth(17, z, 1.3, 1.7));             // columna oeste
+    // Cafetería inferior derecha
+    [61, 64.5, 68, 71.5, 75].forEach(x => booth(x, 42.8, 1.8, 1.2));
+    [45.5, 48.5, 51].forEach(z => booth(76.6, z, 1.3, 1.6));
+    booth(63, 49.5, 1.6, 1.2); booth(71, 49.5, 1.6, 1.2);
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(5, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0xb98a55, roughness: .85 }));
+    counter.position.set(67, 0.5, 47.5); counter.castShadow = true; scene.add(counter);
+    // Mostradores junto a la entrada
+    [[31, 48.8], [49, 48.8]].forEach(([x, z]) => {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1, 0.9),
+        new THREE.MeshStandardMaterial({ color: 0xb98a55, roughness: .85 }));
+      c.position.set(x, 0.5, z); c.castShadow = true; scene.add(c);
+    });
+
+    /* ============ SALÓN CHOCOLATE ============ */
+    const barMat = new THREE.MeshStandardMaterial({ color: 0xc9a97a, roughness: .8 });
+    for (let th = 0.15 * Math.PI; th <= 0.85 * Math.PI; th += Math.PI / 10) {
+      const bx = 8.5 + 2.6 * Math.cos(th), bz = 24.5 + 2.6 * Math.sin(th);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.0, 0.45), barMat);
+      b.position.set(bx, 0.5, bz); b.rotation.y = th + Math.PI / 2;
+      b.castShadow = true; scene.add(b);
+    }
+    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x55402c, roughness: .9 });
+    [[5, 29.5], [8.5, 30], [12, 29.5]].forEach(([x, z]) => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 0.8), sofaMat);
+      s.position.set(x, 0.3, z); s.castShadow = true; scene.add(s);
+    });
+    const backBar = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 0.8), boothCols ? new THREE.MeshStandardMaterial({ color: 0x8a6642 }) : null);
+    backBar.position.set(8.5, 0.55, 30.4); backBar.castShadow = true; scene.add(backBar);
+
+    /* ============ DESARROLLO COMERCIAL ============ */
+    [[6, 34.5], [11, 34.5]].forEach(([x, z]) => {
+      const d = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 1),
+        new THREE.MeshStandardMaterial({ color: 0xb99b6b, roughness: .85 }));
+      d.position.set(x, 0.45, z); d.castShadow = true; scene.add(d);
+    });
+
+    /* ============ CATAS (mesas y taburetes) ============ */
+    const tblMat = new THREE.MeshStandardMaterial({ color: 0xefe3d3, roughness: .85 });
+    const stMat = new THREE.MeshStandardMaterial({ color: 0xd8cfc4, roughness: .9 });
+    [[4.5, 40.8], [9.5, 40.8], [13, 40.8], [4.5, 45.3], [9.5, 45.3], [13, 45.3], [7, 49.8], [11.5, 49.8]].forEach(([x, z]) => {
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.75, 16), tblMat);
+      t.position.set(x, 0.375, z); t.castShadow = true; t.receiveShadow = true; scene.add(t);
+      for (let k = 0; k < 3; k++) {
+        const a = k * Math.PI * 2 / 3;
+        const s = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 10), stMat);
+        s.position.set(x + Math.cos(a) * 1.05, 0.25, z + Math.sin(a) * 1.05);
+        s.castShadow = true; scene.add(s);
+      }
+    });
+
+    /* ============ CAVACAO (árboles) ============ */
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: .9 });
+    const leafA = new THREE.MeshStandardMaterial({ color: 0x4a7c3f, roughness: .9 });
+    const leafB = new THREE.MeshStandardMaterial({ color: 0x5d8a4a, roughness: .9 });
+    function tree(x, z, s = 1) {
+      const g = new THREE.Group();
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 1.4 * s, 8), trunkMat);
+      tr.position.y = 0.7 * s; tr.castShadow = true; g.add(tr);
+      const c1 = new THREE.Mesh(new THREE.SphereGeometry(1.05 * s, 10, 8), leafA); c1.position.y = 1.9 * s; c1.castShadow = true;
+      const c2 = new THREE.Mesh(new THREE.SphereGeometry(0.7 * s, 10, 8), leafB); c2.position.set(0.55 * s, 2.4 * s, 0.3 * s); c2.castShadow = true;
+      const c3 = new THREE.Mesh(new THREE.SphereGeometry(0.6 * s, 10, 8), leafB); c3.position.set(-0.5 * s, 2.15 * s, -0.3 * s); c3.castShadow = true;
+      g.add(c1, c2, c3); g.position.set(x, 0, z); scene.add(g);
+    }
+    [[63, 21], [67.5, 20.5], [72, 21.5], [75, 24], [62.5, 29], [67, 28.5], [71.5, 30], [74.5, 33], [63, 35.5], [68, 36.5]]
+      .forEach(([x, z]) => tree(x, z, 0.85 + Math.random() * 0.4));
+
+    /* ============ FRANJA DE SERVICIOS (techos y baños) ============ */
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0xb0b5bd, roughness: .9 });
+    [19.5, 27, 34.5, 42, 49.5, 55.5].forEach((x, i) => {
+      const h = 2.3 + (i % 2) * 0.5;
+      const r = new THREE.Mesh(new THREE.BoxGeometry(6.5, h, 2.4), roofMat);
+      r.position.set(x, h / 2, 17.4); r.castShadow = true; r.receiveShadow = true; scene.add(r);
+    });
+    const wcMat = new THREE.MeshStandardMaterial({ color: 0xd6d8dc, roughness: .9 });
+    [[23, 19.9, 5], [47, 19.9, 5], [24.5, 49, 4], [55.5, 49, 4]].forEach(([x, z, d]) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(d === 5 ? 6 : 5, 1.9, 4), wcMat);
+      b.position.set(x, 0.95, z); b.castShadow = true; b.receiveShadow = true; scene.add(b);
+    });
+
+    /* ============ ETIQUETAS (sprites) ============ */
+    function makeLabel(text, opts = {}) {
+      const size = opts.size || 44, scale = opts.scale || 0.03, color = opts.color || '#3a2a1a';
+      const lines = text.split('\n');
+      const c = document.createElement('canvas');
+      let ctx = c.getContext('2d');
+      ctx.font = `bold ${size}px Arial, sans-serif`;
+      let w = 0; lines.forEach(l => w = Math.max(w, ctx.measureText(l).width));
+      c.width = Math.ceil(w + 48); c.height = Math.ceil(lines.length * size * 1.25 + 24);
+      ctx = c.getContext('2d');
+      ctx.font = `bold ${size}px Arial, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+      lines.forEach((l, i) => {
+        const yy = 12 + size * 0.62 + i * size * 1.25;
+        ctx.lineWidth = size * 0.16; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.strokeText(l, c.width / 2, yy);
+        ctx.fillStyle = color; ctx.fillText(l, c.width / 2, yy);
+      });
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+      spr.scale.set(c.width * scale, c.height * scale, 1);
+      return spr;
+    }
+    function addLabel(text, x, y, z, opts) { const s = makeLabel(text, opts); s.position.set(x, y, z); scene.add(s); }
+
+    addLabel('SALÓN\nCHOCOLATE', 8.5, 2.7, 20.6, { color: '#ffffff', size: 40, scale: 0.026 });
+    addLabel('DESARROLLO\nCOMERCIAL', 8.5, 2.3, 36.3, { color: '#4a3a28', size: 34, scale: 0.022 });
+    addLabel('CATAS', 8.7, 2.6, 46.5, { color: '#6e2350', size: 48, scale: 0.028 });
+    addLabel('CHOCOLATERÍAS Y BEBIDAS', 37, 3.0, 22.6, { color: '#3a2a1a', size: 46, scale: 0.026 });
+    addLabel('CAVACAO', 68.5, 2.3, 37.8, { color: '#2f4a22', size: 46, scale: 0.028 });
+    addLabel('CHOCOLATERÍAS\nBEBIDAS', 68.5, 2.5, 45.6, { color: '#4a2f18', size: 38, scale: 0.024 });
+    addLabel('ENTRADA', 40, 2.2, 60.5, { color: '#3a2a1a', size: 56, scale: 0.042 });
+
+    /* ============ PUNTOS DE INFORMACIÓN (?) ============ */
+    function infoDot(x, z, y = 1.6) {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.beginPath(); ctx.arc(64, 64, 58, 0, Math.PI * 2); ctx.fillStyle = '#5b3a21'; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 84px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('?', 64, 70);
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+      spr.scale.set(1.6, 1.6, 1); spr.position.set(x, y, z); scene.add(spr);
+    }
+    infoDot(48.6, 45.4); infoDot(51.2, 45.4); infoDot(28.6, 50.6); infoDot(30.8, 51.6);
+    infoDot(47.6, 51.2); infoDot(56, 18.5, 2.8);
+
+    /* ============ SEÑAL DE ENTRADA (flechas) ============ */
+    function arrow(x, z, rot = 0, s = 1, color = 0x8a5a3b) {
+      const p = [[-0.45, 1.2], [0.45, 1.2], [0.45, -0.6], [1.2, -0.6], [0, -2], [-1.2, -0.6], [-0.45, -0.6]];
+      const sh = new THREE.Shape(); sh.moveTo(p[0][0] * s, p[0][1] * s);
+      for (let i = 1; i < p.length; i++) sh.lineTo(p[i][0] * s, p[i][1] * s);
+      sh.closePath();
+      const m = new THREE.Mesh(new THREE.ShapeGeometry(sh),
+        new THREE.MeshStandardMaterial({ color, roughness: .8, side: THREE.DoubleSide }));
+      m.rotation.x = -Math.PI / 2; m.rotation.z = rot;
+      m.position.set(x, 0.05, z); scene.add(m);
+    }
+    arrow(40, 56.5, 0, 1.6); arrow(31.5, 53.5, -Math.PI / 6, 1.1); arrow(48.5, 53.5, Math.PI / 6, 1.1);
+
+    /* ============ BUCLE ============ */
+    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+    animate();
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+
+</html> -->

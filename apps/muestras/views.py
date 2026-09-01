@@ -7,7 +7,7 @@ from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import FormView, TemplateView
 
-from .constants import EVENTO_NOMBRE
+from .constants import EVENTO_INFO, EVENTO_NOMBRE
 from .forms import Paso1Form, Paso2Form
 from .services import get_or_create_solicitud, guardar_paso1, guardar_paso2
 
@@ -25,15 +25,29 @@ def _datos_globales(user):
     except DatosGenerales.DoesNotExist:
         datos = None
 
+    if expediente.tipo_persona == Expediente.TipoPersona.PERSONA_MORAL:
+        campos = [
+            ("Razón social", getattr(datos, "nombres", "") or "—"),
+            ("Representante legal", getattr(datos, "representante_legal", "") or "—"),
+            ("CURP del representante legal", getattr(datos, "curp", "") or "—"),
+        ]
+    else:
+        nombre = " ".join(filter(None, [
+            getattr(datos, "nombres", ""),
+            getattr(datos, "apellido_paterno", ""),
+            getattr(datos, "apellido_materno", ""),
+        ]))
+        campos = [
+            ("Nombre completo", nombre or "—"),
+            ("CURP", getattr(datos, "curp", "") or "—"),
+        ]
+    campos.extend([
+        ("Número de celular", getattr(datos, "telefono", "") or "—"),
+        ("Correo electrónico", getattr(datos, "correo_contacto", "") or user.correo),
+    ])
     return {
-        "tipo_persona": expediente.get_tipo_persona_display()
-        if expediente.tipo_persona
-        else "—",
-        "nombres": getattr(datos, "nombres", "") or "—",
-        "telefono": getattr(datos, "telefono", "") or "—",
-        "correo": getattr(datos, "correo_contacto", "") or user.correo,
-        "curp": getattr(datos, "curp", "") or "—",
-        "representante_legal": getattr(datos, "representante_legal", "") or "—",
+        "tipo_persona": expediente.get_tipo_persona_display() if expediente.tipo_persona else "—",
+        "campos": campos,
     }
 
 
@@ -51,10 +65,18 @@ class Paso1View(LoginRequiredMixin, FormView):
 
     def get_initial(self):
         return {
-            "nombre_comercio": self.solicitud.nombre_comercio,
             "giro": self.solicitud.giro,
             "programa_especial": self.solicitud.programa_especial,
+            "productos": self.solicitud.productos.all(),
+            "mobiliario": self.solicitud.mobiliario.all(),
         }
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["expediente"] = self.request.user.expediente
+        kwargs["solicitud"] = self.solicitud
+        kwargs["evento_categoria"] = EVENTO_INFO["categoria"]
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -62,12 +84,25 @@ class Paso1View(LoginRequiredMixin, FormView):
         context["step"] = 1
         context["solicitud"] = self.solicitud
         context["evento_nombre"] = EVENTO_NOMBRE
+        context["evento_info"] = EVENTO_INFO
         context["datos_globales"] = _datos_globales(self.request.user)
+        context["comercio"] = getattr(self.request.user.expediente, "comercio", None)
         return context
 
     def form_valid(self, form):
+        comercio = getattr(self.request.user.expediente, "comercio", None)
+        if comercio is None:
+            form.add_error(None, "Registra primero la información de tu comercio en Mi perfil.")
+            return self.form_invalid(form)
         try:
-            guardar_paso1(self.solicitud, form.cleaned_data)
+            productos, mobiliario = form.participation_details()
+            guardar_paso1(
+                self.solicitud,
+                form.cleaned_data,
+                nombre_comercio=comercio.nombre,
+                productos=productos,
+                mobiliario=mobiliario,
+            )
         except ValidationError as exc:
             if hasattr(exc, "message_dict"):
                 for field, errs in exc.message_dict.items():

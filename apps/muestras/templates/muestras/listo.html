@@ -29,6 +29,18 @@
         <dt>Programa especial</dt>
         <dd>{{ solicitud.get_programa_especial_display }}</dd>
       </div>
+      <div>
+        <dt>Productos seleccionados</dt>
+        <dd>{% for detail in solicitud.detalle_productos.all %}{{ detail.producto.nombre }}: {{ detail.stock_total }} unidades a ${{ detail.precio_venta }}{% if not forloop.last %}; {% endif %}{% endfor %}</dd>
+      </div>
+      <div>
+        <dt>Mobiliario seleccionado</dt>
+        <dd>{% for detail in solicitud.detalle_mobiliario.all %}{{ detail.mobiliario.nombre }}: {{ detail.cantidad }}{% if not forloop.last %}; {% endif %}{% empty %}Ninguno{% endfor %}</dd>
+      </div>
+      {% if solicitud.cantidad_botes_basura %}
+        <div><dt>Botes de basura</dt><dd>{{ solicitud.cantidad_botes_basura }}</dd></div>
+        <div><dt>Extintores</dt><dd>{{ solicitud.cantidad_extintores }}</dd></div>
+      {% endif %}
     </dl>
   </section>
 

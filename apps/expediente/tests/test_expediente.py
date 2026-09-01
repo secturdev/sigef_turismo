@@ -414,6 +414,7 @@ class FurnitureCatalogTests(TestCase):
             {
                 "action": "add_furniture",
                 "nombre": "Mesa plegable",
+                "tipo": Mobiliario.Tipo.GENERAL,
                 "descripcion": "Mesa para exhibición.",
                 "imagen": self._image(),
             },
@@ -435,6 +436,7 @@ class FurnitureCatalogTests(TestCase):
                 "action": "edit_furniture",
                 "furniture_id": item.pk,
                 "nombre": "Mesa actualizada",
+                "tipo": Mobiliario.Tipo.GENERAL,
                 "descripcion": "Nueva descripción",
             },
         )
