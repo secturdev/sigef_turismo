@@ -176,6 +176,124 @@ def _ruta_version_documento(instance: VersionDocumento, filename: str) -> str:
     )
 
 
+def _ruta_archivo_producto(instance: Producto, filename: str, folder: str) -> str:
+    ext = Path(filename).suffix.lower()
+    return f"private/productos/{instance.expediente_id}/{folder}/{uuid.uuid4().hex}{ext}"
+
+
+def _ruta_imagen_producto(instance: Producto, filename: str) -> str:
+    return _ruta_archivo_producto(instance, filename, "imagenes")
+
+
+def _ruta_factura_producto(instance: Producto, filename: str) -> str:
+    return _ruta_archivo_producto(instance, filename, "facturas")
+
+
+class Producto(models.Model):
+    expediente = models.ForeignKey(
+        Expediente,
+        on_delete=models.CASCADE,
+        related_name="productos",
+        verbose_name="expediente",
+    )
+    nombre = models.CharField("nombre del producto", max_length=150)
+    imagen = models.FileField(
+        "imagen del producto",
+        upload_to=_ruta_imagen_producto,
+        storage=private_document_storage,
+    )
+    factura = models.FileField(
+        "factura",
+        upload_to=_ruta_factura_producto,
+        storage=private_document_storage,
+        blank=True,
+    )
+    descripcion = models.TextField("descripción del producto", max_length=1000)
+    es_principal = models.BooleanField("producto principal", default=False)
+    fecha_creacion = models.DateTimeField("fecha de creación", auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField("fecha de actualización", auto_now=True)
+
+    class Meta:
+        ordering = ["-es_principal", "nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["expediente"],
+                condition=models.Q(es_principal=True),
+                name="un_producto_principal_por_expediente",
+            )
+        ]
+        verbose_name = "producto"
+        verbose_name_plural = "productos"
+
+    def __str__(self) -> str:
+        return self.nombre
+
+
+def _ruta_archivo_mobiliario(instance: Mobiliario, filename: str, folder: str) -> str:
+    ext = Path(filename).suffix.lower()
+    return f"private/mobiliario/{instance.expediente_id}/{folder}/{uuid.uuid4().hex}{ext}"
+
+
+def _ruta_imagen_mobiliario(instance: Mobiliario, filename: str) -> str:
+    return _ruta_archivo_mobiliario(instance, filename, "imagenes")
+
+
+def _ruta_factura_mobiliario(instance: Mobiliario, filename: str) -> str:
+    return _ruta_archivo_mobiliario(instance, filename, "facturas")
+
+
+class Mobiliario(models.Model):
+    expediente = models.ForeignKey(
+        Expediente, on_delete=models.CASCADE, related_name="mobiliario"
+    )
+    nombre = models.CharField("nombre", max_length=150)
+    descripcion = models.TextField("descripción", max_length=1000)
+    imagen = models.FileField(
+        "imagen", upload_to=_ruta_imagen_mobiliario, storage=private_document_storage
+    )
+    factura = models.FileField(
+        "factura",
+        upload_to=_ruta_factura_mobiliario,
+        storage=private_document_storage,
+        blank=True,
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "mobiliario"
+        verbose_name_plural = "mobiliario"
+
+    def __str__(self) -> str:
+        return self.nombre
+
+
+def _ruta_logo_comercio(instance: Comercio, filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    return f"private/comercios/{instance.expediente_id}/logo/{uuid.uuid4().hex}{ext}"
+
+
+class Comercio(models.Model):
+    expediente = models.OneToOneField(
+        Expediente, on_delete=models.CASCADE, related_name="comercio"
+    )
+    nombre = models.CharField("nombre de mi comercio", max_length=200)
+    logo = models.FileField(
+        "logo de mi comercio",
+        upload_to=_ruta_logo_comercio,
+        storage=private_document_storage,
+    )
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "comercio"
+        verbose_name_plural = "comercios"
+
+    def __str__(self) -> str:
+        return self.nombre
+
+
 class Documento(models.Model):
     expediente = models.ForeignKey(
         Expediente,

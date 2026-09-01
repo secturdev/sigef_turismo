@@ -12,6 +12,9 @@ from apps.expediente.models import (
     CampoAdicional,
     Documento,
     Expediente,
+    Comercio,
+    Mobiliario,
+    Producto,
     TipoDocumento,
     ValorCampoAdicional,
     VersionDocumento,
@@ -52,7 +55,7 @@ class ExpedienteRulesTests(TestCase):
         response = client.get(reverse("expediente:profile"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Datos generales")
+        self.assertContains(response, "Información")
         self.assertContains(response, "Documentos")
 
     def test_persona_fisica_requires_curp(self):
@@ -298,3 +301,181 @@ class DocumentTests(TestCase):
         )
         progress = calculate_expediente_progress(self.expediente)
         self.assertGreater(progress["percent"], 0)
+
+
+class ProductCatalogTests(TestCase):
+    def setUp(self):
+        self.user = Usuario.objects.create_user(
+            correo="productos@example.com", password="ClaveSegura123!"
+        )
+        self.expediente = get_or_create_expediente(self.user)
+        set_tipo_persona(self.expediente, Expediente.TipoPersona.PERSONA_FISICA)
+        self.client.force_login(self.user)
+
+    def _image(self, name="producto.jpg"):
+        return SimpleUploadedFile(name, b"imagen", content_type="image/jpeg")
+
+    def test_add_product_without_optional_invoice(self):
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {
+                "action": "add_product",
+                "nombre": "Chocolate artesanal",
+                "descripcion": "Chocolate elaborado con cacao tabasqueño.",
+                "es_principal": "on",
+                "imagen": self._image(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        product = Producto.objects.get(expediente=self.expediente)
+        self.assertTrue(product.es_principal)
+        self.assertFalse(bool(product.factura))
+
+    def test_only_one_product_can_be_principal(self):
+        first = Producto.objects.create(
+            expediente=self.expediente,
+            nombre="Primero",
+            descripcion="Primero",
+            imagen=self._image("primero.jpg"),
+            es_principal=True,
+        )
+        self.client.post(
+            reverse("expediente:profile"),
+            {
+                "action": "add_product",
+                "nombre": "Segundo",
+                "descripcion": "Segundo",
+                "es_principal": "on",
+                "imagen": self._image("segundo.jpg"),
+            },
+        )
+        first.refresh_from_db()
+        self.assertFalse(first.es_principal)
+        self.assertEqual(
+            Producto.objects.filter(expediente=self.expediente, es_principal=True).count(),
+            1,
+        )
+
+    def test_owner_can_edit_product(self):
+        product = Producto.objects.create(
+            expediente=self.expediente,
+            nombre="Nombre anterior",
+            descripcion="Descripción anterior",
+            imagen=self._image("editar.jpg"),
+        )
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {
+                "action": "edit_product",
+                "product_id": product.pk,
+                "nombre": "Nombre actualizado",
+                "descripcion": "Descripción actualizada",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        product.refresh_from_db()
+        self.assertEqual(product.nombre, "Nombre actualizado")
+
+    def test_owner_can_delete_product_and_files(self):
+        product = Producto.objects.create(
+            expediente=self.expediente,
+            nombre="Producto a eliminar",
+            descripcion="Descripción",
+            imagen=self._image("eliminar.jpg"),
+        )
+        image_name = product.imagen.name
+        storage = product.imagen.storage
+
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {"action": "delete_product", "product_id": product.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Producto.objects.filter(pk=product.pk).exists())
+        self.assertFalse(storage.exists(image_name))
+
+
+class FurnitureCatalogTests(TestCase):
+    def setUp(self):
+        self.user = Usuario.objects.create_user(
+            correo="mobiliario@example.com", password="ClaveSegura123!"
+        )
+        self.expediente = get_or_create_expediente(self.user)
+        set_tipo_persona(self.expediente, Expediente.TipoPersona.PERSONA_FISICA)
+        self.client.force_login(self.user)
+
+    def _image(self, name="mesa.jpg"):
+        return SimpleUploadedFile(name, b"imagen", content_type="image/jpeg")
+
+    def test_add_furniture_without_invoice(self):
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {
+                "action": "add_furniture",
+                "nombre": "Mesa plegable",
+                "descripcion": "Mesa para exhibición.",
+                "imagen": self._image(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        item = Mobiliario.objects.get(expediente=self.expediente)
+        self.assertFalse(bool(item.factura))
+
+    def test_edit_and_delete_furniture(self):
+        item = Mobiliario.objects.create(
+            expediente=self.expediente,
+            nombre="Mesa",
+            descripcion="Descripción",
+            imagen=self._image("editar-mesa.jpg"),
+        )
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {
+                "action": "edit_furniture",
+                "furniture_id": item.pk,
+                "nombre": "Mesa actualizada",
+                "descripcion": "Nueva descripción",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.nombre, "Mesa actualizada")
+
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {"action": "delete_furniture", "furniture_id": item.pk},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Mobiliario.objects.filter(pk=item.pk).exists())
+
+
+class CommerceProfileTests(TestCase):
+    def setUp(self):
+        self.user = Usuario.objects.create_user(
+            correo="comercio@example.com", password="ClaveSegura123!"
+        )
+        self.expediente = get_or_create_expediente(self.user)
+        set_tipo_persona(self.expediente, Expediente.TipoPersona.PERSONA_FISICA)
+        self.client.force_login(self.user)
+
+    def _logo(self):
+        return SimpleUploadedFile("logo.png", b"logo", content_type="image/png")
+
+    def test_create_and_update_commerce(self):
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {"action": "save_commerce", "nombre": "Cacao del Edén", "logo": self._logo()},
+        )
+        self.assertEqual(response.status_code, 302)
+        commerce = Comercio.objects.get(expediente=self.expediente)
+        self.assertEqual(commerce.nombre, "Cacao del Edén")
+
+        response = self.client.post(
+            reverse("expediente:profile"),
+            {"action": "save_commerce", "nombre": "Cacao Tabasco"},
+        )
+        self.assertEqual(response.status_code, 302)
+        commerce.refresh_from_db()
+        self.assertEqual(commerce.nombre, "Cacao Tabasco")
+        self.assertTrue(bool(commerce.logo))

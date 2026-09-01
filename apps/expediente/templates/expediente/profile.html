@@ -9,13 +9,36 @@
   <nav class="profile-tabs" role="tablist" aria-label="Secciones de mi perfil">
     <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'general' }"
       @click="activeTab = 'general'" role="tab" :aria-selected="activeTab === 'general'">
-      Datos generales
+      Información
     </button>
+
     <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'documents' }"
       @click="activeTab = 'documents'" role="tab" :aria-selected="activeTab === 'documents'">
       Documentos
       <span class="profile-tab__count">{{ progress.documentos|length }}</span>
     </button>
+
+    <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'comercio' }"
+      @click="activeTab = 'comercio'" role="tab" :aria-selected="activeTab === 'comercio'">
+      Comercio
+    </button>
+
+    <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'products' }"
+      @click="activeTab = 'products'" role="tab" :aria-selected="activeTab === 'products'">
+      Productos
+      <span class="profile-tab__count">{{ products|length }}</span>
+    </button>
+    <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'electrodomésticos' }"
+      @click="activeTab = 'electrodomésticos'" role="tab" :aria-selected="activeTab === 'electrodomésticos'">
+      Electrodomésticos
+      <span class="profile-tab__count">{{ progress.electrodomésticos|length }}</span>
+    </button>
+    <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'mobiliario' }"
+      @click="activeTab = 'mobiliario'" role="tab" :aria-selected="activeTab === 'mobiliario'">
+      Mobiliario
+      <span class="profile-tab__count">{{ furniture|length }}</span>
+    </button>
+
   </nav>
 
   <section x-show="activeTab === 'general'" role="tabpanel">
@@ -25,20 +48,55 @@
             Los datos de identidad fueron verificados por Llave Tabasco y no se pueden editar.
           </div>
         {% endif %} -->
-      <form method="post" class="form-stack" novalidate>
+        <form method="post" class="profile-general-grid" novalidate>
         {% csrf_token %}
         <input type="hidden" name="action" value="save_general" />
         {% for field in general_form %}
         {% include "components/_form_field.html" with field=field %}
         {% endfor %}
-        <div class="form-actions">
+          <div class="form-actions profile-general-actions">
           <button type="submit" class="btn-primary btn-lg">Guardar datos</button>
         </div>
       </form>
     </div>
   </section>
 
+  <!-- COMERCIO -->
+  <section x-show="activeTab === 'comercio'" x-cloak role="tabpanel">
+    <div class="commerce-panel">
+      {% if commerce %}
+        <div class="commerce-preview">
+          <div class="commerce-preview__logo">
+            <img src="{% url 'expediente:commerce_logo' %}" alt="Logo de {{ commerce.nombre }}" />
+          </div>
+          <div>
+            <span>Mi comercio</span>
+            <h2>{{ commerce.nombre }}</h2>
+            <p>Puedes actualizar el nombre o sustituir el logo cuando lo necesites.</p>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="product-form-panel">
+        <div class="product-form-panel__heading">
+          <h3>{% if commerce %}Editar mi comercio{% else %}Registrar mi comercio{% endif %}</h3>
+          <p>Agrega el nombre con el que se identifica tu comercio y su logotipo.</p>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="product-form-grid" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_commerce" />
+          {% include "components/_form_field.html" with field=commerce_form.nombre %}
+          {% include "components/_form_field.html" with field=commerce_form.logo %}
+          <div class="product-form-actions">
+            <button type="submit" class="btn-primary btn-lg">{% if commerce %}Guardar cambios{% else %}Guardar comercio{% endif %}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
   <section x-show="activeTab === 'documents'" x-cloak role="tabpanel">
+    {% comment "Propuesta anterior de documentos: se conserva como referencia" %}
     <div class="doc-list">
       {% for item in progress.documentos %}
       <article class="ui-panel doc-card">
@@ -76,6 +134,215 @@
       </div>
       {% endfor %}
     </div>
+    {% endcomment %}
+
+    <div class="documents-workspace">
+      <div class="documents-checklist">
+        {% for item in progress.documentos %}
+          <article class="document-row {% if item.cargado %}is-uploaded{% else %}is-pending{% endif %}">
+            <div class="document-row__status" aria-hidden="true">
+              {% if item.cargado %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6" />
+                </svg>
+              {% else %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M4.9 19h14.2a2 2 0 0 0 1.73-3L13.73 4a2 2 0 0 0-3.46 0L3.17 16A2 2 0 0 0 4.9 19Z" />
+                </svg>
+              {% endif %}
+            </div>
+
+            <div class="document-row__content">
+              <div class="document-row__heading">
+                <div>
+                  <h3 class="document-row__title">{{ item.tipo.nombre }}</h3>
+                  <p class="document-row__hint">
+                    {% if item.cargado %}Documento cargado correctamente{% else %}Archivo PDF pendiente de carga{% endif %}
+                  </p>
+                </div>
+                <div class="profile-doc-badges">
+                  {% if not item.obligatorio %}<span class="badge badge--pending">Opcional</span>{% endif %}
+                  {% if item.cargado %}
+                    <span class="badge badge--{{ item.estado|lower }}">{{ item.estado }}</span>
+                  {% else %}
+                    <span class="badge badge--pending">Pendiente</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if item.version %}
+                <div class="document-current-file">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8m-6-6 6 6m-6-6v6h6" />
+                  </svg>
+                  <div>
+                    <span>Archivo actual</span>
+                    <a href="{% url 'expediente:download_version' item.version.pk %}">{{ item.version.nombre_original }}</a>
+                  </div>
+                </div>
+              {% endif %}
+
+              <details class="document-upload" {% if error_tipo_id == item.tipo.pk %}open{% endif %}>
+                <summary>
+                  {% if item.cargado %}Reemplazar archivo{% else %}Seleccionar archivo PDF{% endif %}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                  </svg>
+                </summary>
+                <form method="post" enctype="multipart/form-data" class="document-upload__form">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="upload_document" />
+                  <input type="hidden" name="tipo_documento_id" value="{{ item.tipo.pk }}" />
+                  <div class="document-upload__fields">
+                    {% include "components/_form_field.html" with field=item.upload_form.archivo %}
+                    {% include "components/_form_field.html" with field=item.upload_form.fecha_emision %}
+                    {% include "components/_form_field.html" with field=item.upload_form.fecha_vencimiento %}
+                  </div>
+                  <button type="submit" class="btn-primary">
+                    {% if item.cargado %}Guardar nuevo archivo{% else %}Subir documento{% endif %}
+                  </button>
+                </form>
+              </details>
+            </div>
+          </article>
+        {% empty %}
+          <div class="documents-empty">
+            <h3>No hay documentos requeridos</h3>
+            <p>Actualmente no existen documentos configurados para tu tipo de persona.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
   </section>
+  <!-- PRODUCTOS -->
+  <section x-show="activeTab === 'products'" x-cloak role="tabpanel">
+    <div class="product-catalog">
+      <!-- AGREGAR PRODUCTO -->
+
+ <div class="product-form-panel" x-ref="productForm" id="product-form">
+        <div class="product-form-panel__heading">
+          <h3>{% if editing_product %}Editar producto{% else %}Registrar producto{% endif %}</h3>
+          <p>{% if editing_product %}Actualiza la información del producto seleccionado.{% else %}La factura es opcional. La imagen, el nombre y la descripción son obligatorios.{% endif %}</p>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="product-form-grid" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="{% if editing_product %}edit_product{% else %}add_product{% endif %}" />
+          {% if editing_product %}<input type="hidden" name="product_id" value="{{ editing_product.pk }}" />{% endif %}
+          {% include "components/_form_field.html" with field=product_form.nombre %}
+          {% include "components/_form_field.html" with field=product_form.imagen %}
+          <div class="product-form-full">{% include "components/_form_field.html" with field=product_form.descripcion %}</div>
+          {% include "components/_form_field.html" with field=product_form.factura %}
+          <div class="product-main-choice">
+            {{ product_form.es_principal }}
+            <label for="{{ product_form.es_principal.id_for_label }}">
+              <strong>Producto principal</strong>
+              <span>Se destacará como el producto representativo de tu perfil.</span>
+            </label>
+          </div>
+          <div class="product-form-actions">
+            {% if editing_product %}<a href="{% url 'expediente:profile' %}?tab=products" class="btn-outline btn-lg">Cancelar</a>{% endif %}
+            <button type="submit" class="btn-primary btn-lg">{% if editing_product %}Guardar cambios{% else %}Guardar producto{% endif %}</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- LISTADO DE PRODUCTOS REGITRADOS -->
+
+      <div class="product-grid">
+        {% for product in products %}
+          <article class="product-card {% if product.es_principal %}is-primary{% endif %}">
+            <div class="product-card__media">
+              <img src="{% url 'expediente:product_image' product.pk %}" alt="{{ product.nombre }}" loading="lazy" />
+              {% if product.es_principal %}<span class="product-card__primary">Producto principal</span>{% endif %}
+            </div>
+            <div class="product-card__body">
+              <h3>{{ product.nombre }}</h3>
+              <p>{{ product.descripcion }}</p>
+              {% if product.factura %}
+                <a class="product-card__invoice" href="{% url 'expediente:product_invoice' product.pk %}">Descargar factura</a>
+              {% else %}
+                <span class="product-card__no-invoice">Sin factura registrada</span>
+              {% endif %}
+              <div class="product-card__actions">
+                <a class="btn-outline product-card__action" href="{% url 'expediente:profile' %}?tab=products&amp;edit_product={{ product.pk }}#product-form">Editar</a>
+                <form method="post" onsubmit="return confirm('¿Deseas eliminar este producto? Esta acción no se puede deshacer.');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_product" />
+                  <input type="hidden" name="product_id" value="{{ product.pk }}" />
+                  <button type="submit" class="product-delete-button">Eliminar</button>
+                </form>
+              </div>
+            </div>
+          </article>
+        {% empty %}
+          <div class="product-empty">
+            <h3>Aún no tienes productos</h3>
+            <p>Agrega el primero para comenzar a construir tu catálogo.</p>
+          </div>
+        {% endfor %}
+      </div>
+
+
+    </div>
+  </section>
+
+  <!-- MOBILIARIO -->
+  <section x-show="activeTab === 'mobiliario'" x-cloak role="tabpanel">
+    <div class="product-catalog">
+      <div class="product-form-panel" id="furniture-form">
+        <div class="product-form-panel__heading">
+          <h3>{% if editing_furniture %}Editar mobiliario{% else %}Registrar mobiliario{% endif %}</h3>
+          <p>Registra el nombre, descripción e imagen. La factura en PDF es opcional.</p>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="product-form-grid" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="{% if editing_furniture %}edit_furniture{% else %}add_furniture{% endif %}" />
+          {% if editing_furniture %}<input type="hidden" name="furniture_id" value="{{ editing_furniture.pk }}" />{% endif %}
+          {% include "components/_form_field.html" with field=furniture_form.nombre %}
+          {% include "components/_form_field.html" with field=furniture_form.imagen %}
+          <div class="product-form-full">{% include "components/_form_field.html" with field=furniture_form.descripcion %}</div>
+          {% include "components/_form_field.html" with field=furniture_form.factura %}
+          <div class="product-form-actions">
+            {% if editing_furniture %}<a href="{% url 'expediente:profile' %}?tab=mobiliario" class="btn-outline btn-lg">Cancelar</a>{% endif %}
+            <button type="submit" class="btn-primary btn-lg">{% if editing_furniture %}Guardar cambios{% else %}Guardar mobiliario{% endif %}</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="product-grid">
+        {% for item in furniture %}
+          <article class="product-card">
+            <div class="product-card__media">
+              <img src="{% url 'expediente:furniture_file' item.pk 'imagen' %}" alt="{{ item.nombre }}" loading="lazy" />
+            </div>
+            <div class="product-card__body">
+              <h3>{{ item.nombre }}</h3>
+              <p>{{ item.descripcion }}</p>
+              {% if item.factura %}
+                <a class="product-card__invoice" href="{% url 'expediente:furniture_file' item.pk 'factura' %}">Descargar factura</a>
+              {% else %}
+                <span class="product-card__no-invoice">Sin factura registrada</span>
+              {% endif %}
+              <div class="product-card__actions">
+                <a class="btn-outline product-card__action" href="{% url 'expediente:profile' %}?tab=mobiliario&amp;edit_furniture={{ item.pk }}#furniture-form">Editar</a>
+                <form method="post" onsubmit="return confirm('¿Deseas eliminar este mobiliario? Esta acción no se puede deshacer.');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_furniture" />
+                  <input type="hidden" name="furniture_id" value="{{ item.pk }}" />
+                  <button type="submit" class="product-delete-button">Eliminar</button>
+                </form>
+              </div>
+            </div>
+          </article>
+        {% empty %}
+          <div class="product-empty">
+            <h3>Aún no tienes mobiliario registrado</h3>
+            <p>Agrega el primer elemento para comenzar tu catálogo.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
 </div>
 {% endblock content %}

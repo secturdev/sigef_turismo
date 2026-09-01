@@ -5,12 +5,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.generic import FormView, TemplateView
 
-from .forms import DocumentUploadForm, GeneralDataForm, PersonTypeForm
-from .models import TipoDocumento, VersionDocumento
+from .forms import CommerceForm, DocumentUploadForm, FurnitureForm, GeneralDataForm, PersonTypeForm, ProductForm
+from .models import Comercio, Mobiliario, Producto, TipoDocumento, VersionDocumento
 from .services import (
     assert_document_owner,
     calculate_expediente_progress,
@@ -114,7 +115,8 @@ class ProfileView(LoginRequiredMixin, View):
         )
 
     def _render(self, *, active_tab="general", general_form=None, upload_form=None,
-                error_tipo_id=None):
+                error_tipo_id=None, product_form=None, editing_product=None,
+                furniture_form=None, editing_furniture=None, commerce_form=None):
         progress = calculate_expediente_progress(self.expediente)
         for item in progress["documentos"]:
             prefix = f"doc-{item['tipo'].pk}"
@@ -123,6 +125,7 @@ class ProfileView(LoginRequiredMixin, View):
                 if error_tipo_id == item["tipo"].pk and upload_form is not None
                 else DocumentUploadForm(prefix=prefix)
             )
+        commerce = Comercio.objects.filter(expediente=self.expediente).first()
         return render(
             self.request,
             self.template_name,
@@ -133,13 +136,38 @@ class ProfileView(LoginRequiredMixin, View):
                 "upload_form": upload_form or DocumentUploadForm(),
                 "error_tipo_id": error_tipo_id,
                 "active_tab": active_tab,
+                "products": self.expediente.productos.all(),
+                "product_form": product_form or ProductForm(instance=editing_product),
+                "editing_product": editing_product,
+                "furniture": self.expediente.mobiliario.all(),
+                "furniture_form": furniture_form or FurnitureForm(instance=editing_furniture),
+                "editing_furniture": editing_furniture,
+                "commerce": commerce,
+                "commerce_form": commerce_form or CommerceForm(instance=commerce),
                 "nav_active": "expediente",
             },
         )
 
     def get(self, request):
         tab = request.GET.get("tab")
-        return self._render(active_tab="documents" if tab == "documents" else "general")
+        active_tab = tab if tab in {"comercio", "documents", "products", "mobiliario"} else "general"
+        editing_product = None
+        if active_tab == "products" and request.GET.get("edit_product"):
+            editing_product = get_object_or_404(
+                Producto,
+                pk=request.GET["edit_product"],
+                expediente=self.expediente,
+            )
+        editing_furniture = None
+        if active_tab == "mobiliario" and request.GET.get("edit_furniture"):
+            editing_furniture = get_object_or_404(
+                Mobiliario, pk=request.GET["edit_furniture"], expediente=self.expediente
+            )
+        return self._render(
+            active_tab=active_tab,
+            editing_product=editing_product,
+            editing_furniture=editing_furniture,
+        )
 
     def post(self, request):
         action = request.POST.get("action")
@@ -176,6 +204,106 @@ class ProfileView(LoginRequiredMixin, View):
             )
             messages.success(request, f"Documento «{tipo.nombre}» actualizado.")
             return redirect(f"{request.path}?tab=documents")
+
+        if action == "add_product":
+            form = ProductForm(request.POST, request.FILES)
+            if not form.is_valid():
+                return self._render(active_tab="products", product_form=form)
+            with transaction.atomic():
+                product = form.save(commit=False)
+                product.expediente = self.expediente
+                if product.es_principal:
+                    self.expediente.productos.filter(es_principal=True).update(
+                        es_principal=False
+                    )
+                product.save()
+            messages.success(request, f"Producto «{product.nombre}» agregado al catálogo.")
+            return redirect(f"{request.path}?tab=products")
+
+        if action == "edit_product":
+            product = get_object_or_404(
+                Producto,
+                pk=request.POST.get("product_id"),
+                expediente=self.expediente,
+            )
+            form = ProductForm(request.POST, request.FILES, instance=product)
+            if not form.is_valid():
+                return self._render(
+                    active_tab="products",
+                    product_form=form,
+                    editing_product=product,
+                )
+            with transaction.atomic():
+                updated = form.save(commit=False)
+                if updated.es_principal:
+                    self.expediente.productos.filter(es_principal=True).exclude(
+                        pk=updated.pk
+                    ).update(es_principal=False)
+                updated.save()
+            messages.success(request, f"Producto «{updated.nombre}» actualizado.")
+            return redirect(f"{request.path}?tab=products")
+
+        if action == "delete_product":
+            product = get_object_or_404(
+                Producto,
+                pk=request.POST.get("product_id"),
+                expediente=self.expediente,
+            )
+            product_name = product.nombre
+            files = [product.imagen, product.factura]
+            product.delete()
+            for stored_file in files:
+                if stored_file and stored_file.name:
+                    stored_file.storage.delete(stored_file.name)
+            messages.success(request, f"Producto «{product_name}» eliminado.")
+            return redirect(f"{request.path}?tab=products")
+
+        if action in {"add_furniture", "edit_furniture"}:
+            furniture = None
+            if action == "edit_furniture":
+                furniture = get_object_or_404(
+                    Mobiliario,
+                    pk=request.POST.get("furniture_id"),
+                    expediente=self.expediente,
+                )
+            form = FurnitureForm(request.POST, request.FILES, instance=furniture)
+            if not form.is_valid():
+                return self._render(
+                    active_tab="mobiliario",
+                    furniture_form=form,
+                    editing_furniture=furniture,
+                )
+            saved = form.save(commit=False)
+            saved.expediente = self.expediente
+            saved.save()
+            messages.success(request, f"Mobiliario «{saved.nombre}» guardado.")
+            return redirect(f"{request.path}?tab=mobiliario")
+
+        if action == "delete_furniture":
+            furniture = get_object_or_404(
+                Mobiliario,
+                pk=request.POST.get("furniture_id"),
+                expediente=self.expediente,
+            )
+            name = furniture.nombre
+            files = [furniture.imagen, furniture.factura]
+            furniture.delete()
+            for stored_file in files:
+                if stored_file and stored_file.name:
+                    stored_file.storage.delete(stored_file.name)
+            messages.success(request, f"Mobiliario «{name}» eliminado.")
+            return redirect(f"{request.path}?tab=mobiliario")
+
+        if action == "save_commerce":
+            commerce = Comercio.objects.filter(expediente=self.expediente).first()
+            form = CommerceForm(request.POST, request.FILES, instance=commerce)
+            if not form.is_valid():
+                return self._render(active_tab="comercio", commerce_form=form)
+            saved = form.save(commit=False)
+            saved.expediente = self.expediente
+            saved.save()
+            messages.success(request, "Información del comercio guardada.")
+            return redirect(f"{request.path}?tab=comercio")
 
         return redirect("expediente:profile")
 
@@ -322,4 +450,47 @@ def download_document_version(request, version_id: int):
         version.archivo.open("rb"),
         as_attachment=True,
         filename=version.nombre_original,
+    )
+
+
+@login_required(login_url="autenticacion:login")
+def product_image(request, product_id: int):
+    product = get_object_or_404(Producto, pk=product_id, expediente__usuario=request.user)
+    if not product.imagen:
+        raise Http404("Imagen no encontrada.")
+    return FileResponse(product.imagen.open("rb"), filename=product.imagen.name.rsplit("/", 1)[-1])
+
+
+@login_required(login_url="autenticacion:login")
+def product_invoice(request, product_id: int):
+    product = get_object_or_404(Producto, pk=product_id, expediente__usuario=request.user)
+    if not product.factura:
+        raise Http404("Factura no encontrada.")
+    return FileResponse(
+        product.factura.open("rb"),
+        as_attachment=True,
+        filename=product.factura.name.rsplit("/", 1)[-1],
+    )
+
+
+@login_required(login_url="autenticacion:login")
+def furniture_file(request, furniture_id: int, file_type: str):
+    furniture = get_object_or_404(
+        Mobiliario, pk=furniture_id, expediente__usuario=request.user
+    )
+    stored_file = furniture.imagen if file_type == "imagen" else furniture.factura
+    if not stored_file:
+        raise Http404("Archivo no encontrado.")
+    return FileResponse(
+        stored_file.open("rb"),
+        as_attachment=file_type == "factura",
+        filename=stored_file.name.rsplit("/", 1)[-1],
+    )
+
+
+@login_required(login_url="autenticacion:login")
+def commerce_logo(request):
+    commerce = get_object_or_404(Comercio, expediente__usuario=request.user)
+    return FileResponse(
+        commerce.logo.open("rb"), filename=commerce.logo.name.rsplit("/", 1)[-1]
     )

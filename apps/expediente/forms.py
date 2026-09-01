@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django import forms
 
-from .models import CampoAdicional, Expediente
+from .models import CampoAdicional, Comercio, Expediente, Mobiliario, Producto
 from .validators import validate_curp, validate_document_file, validate_telefono
 
 INPUT_CLASS = "form-input"
@@ -133,4 +133,94 @@ class DocumentUploadForm(forms.Form):
     def clean_archivo(self):
         uploaded = self.cleaned_data["archivo"]
         validate_document_file(uploaded)
+        return uploaded
+
+
+class ProductForm(forms.ModelForm):
+    class Meta:
+        model = Producto
+        fields = ("nombre", "imagen", "factura", "descripcion", "es_principal")
+        widgets = {
+            "imagen": forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
+            "factura": forms.ClearableFileInput(attrs={"accept": "application/pdf,.pdf"}),
+            "descripcion": forms.Textarea(attrs={"rows": 4}),
+        }
+        labels = {"es_principal": "Marcar como producto principal"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["factura"].required = False
+        self.fields["factura"].help_text = "Opcional. Únicamente PDF (máx. 10 MB)."
+        self.fields["imagen"].help_text = "JPG, PNG o WEBP (máx. 5 MB)."
+        _style_fields(self)
+
+    def clean_imagen(self):
+        uploaded = self.cleaned_data["imagen"]
+        extension = "." + uploaded.name.lower().rsplit(".", 1)[-1] if "." in uploaded.name else ""
+        if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+            raise forms.ValidationError("La imagen debe estar en formato JPG, PNG o WEBP.")
+        if uploaded.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("La imagen no puede superar 5 MB.")
+        return uploaded
+
+    def clean_factura(self):
+        uploaded = self.cleaned_data.get("factura")
+        if uploaded:
+            validate_document_file(uploaded)
+        return uploaded
+
+
+class FurnitureForm(forms.ModelForm):
+    class Meta:
+        model = Mobiliario
+        fields = ("nombre", "imagen", "factura", "descripcion")
+        widgets = {
+            "imagen": forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
+            "factura": forms.ClearableFileInput(attrs={"accept": "application/pdf,.pdf"}),
+            "descripcion": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["factura"].required = False
+        self.fields["factura"].help_text = "Opcional. Únicamente PDF (máx. 10 MB)."
+        self.fields["imagen"].help_text = "JPG, PNG o WEBP (máx. 5 MB)."
+        _style_fields(self)
+
+    def clean_imagen(self):
+        uploaded = self.cleaned_data["imagen"]
+        extension = "." + uploaded.name.lower().rsplit(".", 1)[-1] if "." in uploaded.name else ""
+        if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+            raise forms.ValidationError("La imagen debe estar en formato JPG, PNG o WEBP.")
+        if uploaded.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("La imagen no puede superar 5 MB.")
+        return uploaded
+
+    def clean_factura(self):
+        uploaded = self.cleaned_data.get("factura")
+        if uploaded:
+            validate_document_file(uploaded)
+        return uploaded
+
+
+class CommerceForm(forms.ModelForm):
+    class Meta:
+        model = Comercio
+        fields = ("nombre", "logo")
+        widgets = {
+            "logo": forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["logo"].help_text = "JPG, PNG o WEBP (máx. 5 MB)."
+        _style_fields(self)
+
+    def clean_logo(self):
+        uploaded = self.cleaned_data["logo"]
+        extension = "." + uploaded.name.lower().rsplit(".", 1)[-1] if "." in uploaded.name else ""
+        if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+            raise forms.ValidationError("El logo debe estar en formato JPG, PNG o WEBP.")
+        if uploaded.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("El logo no puede superar 5 MB.")
         return uploaded
