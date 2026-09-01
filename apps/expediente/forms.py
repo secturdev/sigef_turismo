@@ -23,6 +23,14 @@ class PersonTypeForm(forms.Form):
         widget=forms.RadioSelect,
     )
 
+    def __init__(self, *args, identidad_oidc: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if identidad_oidc:
+            self.fields["tipo_persona"].disabled = True
+            self.fields["tipo_persona"].help_text = (
+                "Dato proporcionado por Llave Tabasco; no se puede editar."
+            )
+
 
 class GeneralDataForm(forms.Form):
     nombres = forms.CharField(label="Nombres", max_length=150)
@@ -76,12 +84,13 @@ class GeneralDataForm(forms.Form):
                 "nombres",
                 "apellido_paterno",
                 "apellido_materno",
+                "curp",
                 "correo_contacto",
             ):
                 if field_name in self.fields:
                     self.fields[field_name].disabled = True
                     self.fields[field_name].help_text = (
-                        "Dato proporcionado por Llave Tabasco; no se puede editar."
+                        "Dato proporcionado por Llave Tabasco."
                     )
 
         _style_fields(self)

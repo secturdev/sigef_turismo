@@ -140,6 +140,7 @@ class TipoDocumento(models.Model):
     clave = models.SlugField("clave", max_length=64, unique=True)
     nombre = models.CharField("nombre", max_length=150)
     activo = models.BooleanField("activo", default=True)
+    obligatorio = models.BooleanField("obligatorio", default=True)
     orden = models.PositiveIntegerField("orden", default=0)
     dias_vigencia = models.PositiveIntegerField(
         "días de vigencia",

@@ -1,0 +1,81 @@
+{% extends "layouts/app.html" %}
+
+{% block title %}Mi perfil{% endblock %}
+
+{% block content %}
+<div x-data="{ activeTab: '{{ active_tab|escapejs }}' }">
+  {% include "components/_page_header.html" with title="Mi perfil" subtitle="Consulta tus datos personales y administra los documentos de tu expediente." %}
+
+  <nav class="profile-tabs" role="tablist" aria-label="Secciones de mi perfil">
+    <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'general' }"
+      @click="activeTab = 'general'" role="tab" :aria-selected="activeTab === 'general'">
+      Datos generales
+    </button>
+    <button type="button" class="profile-tab" :class="{ 'is-active': activeTab === 'documents' }"
+      @click="activeTab = 'documents'" role="tab" :aria-selected="activeTab === 'documents'">
+      Documentos
+      <span class="profile-tab__count">{{ progress.documentos|length }}</span>
+    </button>
+  </nav>
+
+  <section x-show="activeTab === 'general'" role="tabpanel">
+    <div class="ui-panel">
+      <!-- {% if request.user.oidc_sub %}
+          <div class="ui-alert ui-alert--info mb-6">
+            Los datos de identidad fueron verificados por Llave Tabasco y no se pueden editar.
+          </div>
+        {% endif %} -->
+      <form method="post" class="form-stack" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_general" />
+        {% for field in general_form %}
+        {% include "components/_form_field.html" with field=field %}
+        {% endfor %}
+        <div class="form-actions">
+          <button type="submit" class="btn-primary btn-lg">Guardar datos</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section x-show="activeTab === 'documents'" x-cloak role="tabpanel">
+    <div class="doc-list">
+      {% for item in progress.documentos %}
+      <article class="ui-panel doc-card">
+        <div class="doc-card__head">
+          <h2 class="doc-card__title">{{ item.tipo.nombre }}</h2>
+          <div class="profile-doc-badges">
+            {% if not item.obligatorio %}<span class="badge badge--pending">Opcional</span>{% endif %}
+            {% if item.cargado %}
+            <span class="badge badge--{{ item.estado|lower }}">{{ item.estado }}</span>
+            {% else %}
+            <span class="badge badge--pending">Pendiente</span>
+            {% endif %}
+          </div>
+        </div>
+        {% if item.version %}
+        <p class="doc-card__meta">Archivo actual:
+          <a href="{% url 'expediente:download_version' item.version.pk %}">{{ item.version.nombre_original }}</a>
+        </p>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data" class="form-stack form-stack--tight">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="upload_document" />
+          <input type="hidden" name="tipo_documento_id" value="{{ item.tipo.pk }}" />
+          {% include "components/_form_field.html" with field=item.upload_form.archivo %}
+          {% include "components/_form_field.html" with field=item.upload_form.fecha_emision %}
+          {% include "components/_form_field.html" with field=item.upload_form.fecha_vencimiento %}
+          <button type="submit" class="btn-primary btn-lg">
+            {% if item.cargado %}Actualizar documento{% else %}Subir documento{% endif %}
+          </button>
+        </form>
+      </article>
+      {% empty %}
+      <div class="ui-panel">
+        <p>No hay documentos configurados para tu tipo de persona.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock content %}

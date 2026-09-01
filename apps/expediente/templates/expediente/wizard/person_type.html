@@ -3,7 +3,6 @@
 {% block title %}Tipo de persona{% endblock %}
 
 {% block content %}
-  {% include "components/_wizard_steps.html" with step=step %}
   {% include "components/_page_header.html" with title="Tipo de persona" subtitle="Elige la opción que mejor te describe." %}
 
   <section class="ui-panel">
@@ -21,6 +20,9 @@
           <p class="form-error">{{ error }}</p>
         {% endfor %}
       </fieldset>
+      {% if identidad_oidc %}
+        <p class="ui-alert ui-alert--info">El tipo de persona fue verificado por Llave Tabasco y no puede modificarse.</p>
+      {% endif %}
       <div class="form-actions">
         <button type="submit" class="btn-primary btn-lg">Guardar y continuar</button>
       </div>

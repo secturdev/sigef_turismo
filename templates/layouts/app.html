@@ -1,6 +1,10 @@
 {% extends "_base.html" %}
 {% load static %}
 
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'src/app-overrides.css' %}" />
+{% endblock extra_css %}
+
 {% block body %}
   <div class="app-shell" x-data="{ sidebarOpen: false }">
     {% include "components/_sidebar.html" %}

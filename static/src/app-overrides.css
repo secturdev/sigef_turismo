@@ -1,0 +1,69 @@
+/* Ajustes de estado que deben cargarse después del CSS compilado. */
+.form-input:disabled,
+.form-input[readonly] {
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+  background-color: #e2e8f0;
+  color: #475569;
+  /* box-shadow: inset 3px 0 0 #1e5b4f; */
+  opacity: 1;
+}
+
+.form-input:disabled:focus,
+.form-input[readonly]:focus {
+  border-color: #cbd5e1;
+  box-shadow: inset 3px 0 0 #1e5b4f;
+  outline: none;
+}
+
+.form-field:has(.form-input:disabled) .form-label,
+.form-field:has(.form-input[readonly]) .form-label {
+  color: #475569;
+}
+
+.choice-card:has(input:disabled) {
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+  background-color: #e2e8f0;
+  color: #475569;
+  opacity: 1;
+}
+
+.profile-tabs {
+  display: flex;
+  gap: .35rem;
+  margin-bottom: 1.5rem;
+  padding: .35rem;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.profile-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  min-height: 44px;
+  padding: .65rem 1.1rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-tab:hover { background: #f1f5f9; color: #334155; }
+.profile-tab.is-active { background: #1e5b4f; color: #fff; }
+.profile-tab__count {
+  min-width: 1.45rem;
+  padding: .1rem .4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .18);
+  font-size: .72rem;
+}
+.profile-doc-badges { display: flex; flex-wrap: wrap; gap: .45rem; }

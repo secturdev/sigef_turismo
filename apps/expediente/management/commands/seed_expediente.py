@@ -13,6 +13,15 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": None,
         "orden": 10,
         "tipos_persona": [CIUDADANO, FISICA],
+        "obligatorio": True,
+    },
+    {
+        "clave": "CURP",
+        "nombre": "CURP",
+        "dias_vigencia": None,
+        "orden": 15,
+        "tipos_persona": [FISICA],
+        "obligatorio": True,
     },
     {
         "clave": "COMPROBANTE_DOMICILIO",
@@ -20,6 +29,7 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": 90,
         "orden": 20,
         "tipos_persona": [CIUDADANO, FISICA],
+        "obligatorio": True,
     },
     {
         "clave": "CONSTANCIA_SITUACION_FISCAL",
@@ -27,6 +37,7 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": 30,
         "orden": 30,
         "tipos_persona": [FISICA],
+        "obligatorio": False,
     },
     {
         "clave": "INE_REPRESENTANTE",
@@ -34,6 +45,15 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": None,
         "orden": 10,
         "tipos_persona": [MORAL],
+        "obligatorio": True,
+    },
+    {
+        "clave": "CURP_REPRESENTANTE_LEGAL",
+        "nombre": "CURP del representante legal",
+        "dias_vigencia": None,
+        "orden": 15,
+        "tipos_persona": [MORAL],
+        "obligatorio": True,
     },
     {
         "clave": "COMPROBANTE_DOMICILIO_EMPRESA",
@@ -41,6 +61,7 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": 90,
         "orden": 20,
         "tipos_persona": [MORAL],
+        "obligatorio": True,
     },
     {
         "clave": "ACTA_CONSTITUTIVA",
@@ -48,6 +69,7 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": None,
         "orden": 30,
         "tipos_persona": [MORAL],
+        "obligatorio": True,
     },
     {
         "clave": "PODER_NOTARIAL",
@@ -55,6 +77,7 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": None,
         "orden": 40,
         "tipos_persona": [MORAL],
+        "obligatorio": True,
     },
     {
         "clave": "CONSTANCIA_SITUACION_FISCAL_EMPRESA",
@@ -62,6 +85,7 @@ TIPOS_DOCUMENTO = [
         "dias_vigencia": 30,
         "orden": 50,
         "tipos_persona": [MORAL],
+        "obligatorio": True,
     },
 ]
 
@@ -82,6 +106,7 @@ class Command(BaseCommand):
                     "dias_vigencia": item["dias_vigencia"],
                     "orden": item["orden"],
                     "tipos_persona": item["tipos_persona"],
+                    "obligatorio": item["obligatorio"],
                 },
             )
             if was_created:

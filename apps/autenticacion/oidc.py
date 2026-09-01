@@ -39,11 +39,23 @@ def _sync_expediente_identity(user, claims) -> None:
     """Copia al expediente los atributos de identidad administrados por OIDC."""
     # logger.warning("Usuari",user)
     expediente = get_or_create_expediente(user)
+    tipo_claim = (claims.get("tipo") or "").strip().casefold()
+    tipos = {
+        "persona física": expediente.TipoPersona.PERSONA_FISICA,
+        "persona fisica": expediente.TipoPersona.PERSONA_FISICA,
+        "persona moral": expediente.TipoPersona.PERSONA_MORAL,
+    }
+    tipo_persona = tipos.get(tipo_claim)
+    if tipo_persona and expediente.tipo_persona != tipo_persona:
+        expediente.tipo_persona = tipo_persona
+        expediente.save(update_fields=["tipo_persona", "fecha_actualizacion"])
+
     datos, _ = DatosGenerales.objects.get_or_create(expediente=expediente)
     claim_fields = {
         "nombres": (claims.get("given_name") or "").strip(),
         "apellido_paterno": (claims.get("family_name") or "").strip(),
         "apellido_materno": (claims.get("apellido_materno") or "").strip(),
+        "curp": (claims.get("curp") or "").strip().upper(),
         "correo_contacto": (claims.get("email") or "").strip().lower(),
     }
     changed_fields = []
@@ -70,6 +82,14 @@ def provider_logout(request) -> str:
 
 
 class LlaveTabascoOIDCBackend(OIDCAuthenticationBackend):
+    def get_userinfo(self, access_token, id_token, payload):
+        """Combina el ID token con userinfo para conservar claims personalizados."""
+        userinfo = super().get_userinfo(access_token, id_token, payload)
+        # Llave Tabasco puede entregar CURP, tipo y apellido materno solamente
+        # dentro del ID token. Los valores de userinfo tienen prioridad cuando
+        # el proveedor devuelve el mismo claim en ambos lugares.
+        return {**(payload or {}), **(userinfo or {})}
+
     def _verify_jws(self, payload, key):
         header = jwt.get_unverified_header(payload)
         alg = header.get("alg")

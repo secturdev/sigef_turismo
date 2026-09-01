@@ -3,7 +3,6 @@
 {% block title %}Documentos{% endblock %}
 
 {% block content %}
-  {% include "components/_wizard_steps.html" with step=step %}
   {% include "components/_page_header.html" with title="Documentos" subtitle="Carga en PDF los documentos requeridos para tu tipo de persona." %}
 
   <div class="doc-list">
@@ -11,6 +10,7 @@
       <section class="ui-panel doc-card">
         <div class="doc-card__head">
           <h2 class="doc-card__title">{{ item.tipo.nombre }}</h2>
+          {% if not item.obligatorio %}<span class="badge badge--pending">Opcional</span>{% endif %}
           {% if item.cargado %}
             <span class="badge badge--{{ item.estado|lower }}">{{ item.estado }}</span>
           {% else %}

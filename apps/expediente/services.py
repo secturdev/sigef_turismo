@@ -293,7 +293,8 @@ def _documentos_requeridos(expediente: Expediente | None = None) -> list[TipoDoc
 
 def calculate_expediente_progress(expediente: Expediente) -> dict[str, Any]:
     tipos = _documentos_requeridos(expediente)
-    total = 1 + 1 + len(tipos)  # tipo persona + datos + cada documento
+    tipos_obligatorios = [tipo for tipo in tipos if tipo.obligatorio]
+    total = 1 + 1 + len(tipos_obligatorios)
     done = 0
 
     has_tipo = bool(expediente.tipo_persona)
@@ -312,7 +313,7 @@ def calculate_expediente_progress(expediente: Expediente) -> dict[str, Any]:
             .first()
         )
         version = documento.version_actual if documento else None
-        if version:
+        if version and tipo.obligatorio:
             done += 1
         docs_status.append(
             {
@@ -321,6 +322,7 @@ def calculate_expediente_progress(expediente: Expediente) -> dict[str, Any]:
                 "version": version,
                 "estado": calculate_document_status(version),
                 "cargado": version is not None,
+                "obligatorio": tipo.obligatorio,
             }
         )
 
@@ -343,6 +345,6 @@ def _next_step(has_tipo: bool, has_datos: bool, docs_status: list[dict]) -> str 
     if not has_datos:
         return "general_data"
     for item in docs_status:
-        if not item["cargado"]:
+        if item["obligatorio"] and not item["cargado"]:
             return "documents"
     return None

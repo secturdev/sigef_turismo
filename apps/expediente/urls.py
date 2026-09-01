@@ -7,6 +7,7 @@ app_name = "expediente"
 urlpatterns = [
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("eventos/", views.EventsView.as_view(), name="events"),
+    path("mi-perfil/", views.ProfileView.as_view(), name="profile"),
     path(
         "expediente/tipo-persona/",
         views.PersonTypeView.as_view(),

@@ -3,19 +3,23 @@
 {% block title %}Datos generales{% endblock %}
 
 {% block content %}
-  {% include "components/_wizard_steps.html" with step=step %}
-  {% include "components/_page_header.html" with title="Datos generales" subtitle="Completa los datos requeridos según tu tipo de persona." %}
+{% include "components/_page_header.html" with title="Datos generales"  %}
 
-  <section class="ui-panel">
-    <form method="post" class="form-stack" novalidate>
-      {% csrf_token %}
-      {% for field in form %}
-        {% include "components/_form_field.html" with field=field %}
-      {% endfor %}
-      <div class="form-actions form-actions--split">
-        <a href="{% url 'expediente:person_type' %}" class="btn-outline btn-lg">Atrás</a>
-        <button type="submit" class="btn-primary btn-lg">Guardar y continuar</button>
-      </div>
-    </form>
-  </section>
+<section class="ui-panel">
+  <!-- {% if request.user.oidc_sub %}
+  <div class="ui-alert ui-alert--info mb-6">
+    Los datos de identidad fueron verificados por Llave Tabasco y no se pueden editar.
+  </div>
+  {% endif %} -->
+  <form method="post" class="form-stack" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+    {% include "components/_form_field.html" with field=field %}
+    {% endfor %}
+    <div class="form-actions form-actions--split">
+      <a href="{% url 'expediente:person_type' %}" class="btn-outline btn-lg">Atrás</a>
+      <button type="submit" class="btn-primary btn-lg">Guardar y continuar</button>
+    </div>
+  </form>
+</section>
 {% endblock content %}

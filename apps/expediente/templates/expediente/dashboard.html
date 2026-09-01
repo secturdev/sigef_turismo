@@ -32,7 +32,7 @@
           {% if progress.next_step == "person_type" %}
             <a href="{% url 'expediente:person_type' %}" class="btn-accent btn-lg dashboard-step__cta">Comenzar aquí</a>
           {% elif progress.has_tipo_persona %}
-            <a href="{% url 'expediente:person_type' %}" class="dashboard-step__link">Revisar</a>
+            <a href="{% url 'expediente:profile' %}" class="dashboard-step__link">Revisar</a>
           {% endif %}
         </div>
       </li>
@@ -53,9 +53,9 @@
           <h3 class="dashboard-step__name">Datos generales</h3>
           <p class="dashboard-step__text">Captura la información básica de tu expediente.</p>
           {% if progress.next_step == "general_data" %}
-            <a href="{% url 'expediente:general_data' %}" class="btn-accent btn-lg dashboard-step__cta">Continuar con datos</a>
+            <a href="{% url 'expediente:profile' %}" class="btn-accent btn-lg dashboard-step__cta">Continuar con datos</a>
           {% elif progress.has_datos_generales %}
-            <a href="{% url 'expediente:general_data' %}" class="dashboard-step__link">Revisar</a>
+            <a href="{% url 'expediente:profile' %}" class="dashboard-step__link">Revisar</a>
           {% endif %}
         </div>
       </li>
@@ -76,9 +76,9 @@
           <h3 class="dashboard-step__name">Documentos</h3>
           <p class="dashboard-step__text">Carga los archivos PDF requeridos para validar tu expediente.</p>
           {% if progress.next_step == "documents" %}
-            <a href="{% url 'expediente:documents' %}" class="btn-accent btn-lg dashboard-step__cta">Subir documentos</a>
+            <a href="{% url 'expediente:profile' %}?tab=documents" class="btn-accent btn-lg dashboard-step__cta">Subir documentos</a>
           {% elif progress.is_complete %}
-            <a href="{% url 'expediente:documents' %}" class="dashboard-step__link">Revisar</a>
+            <a href="{% url 'expediente:profile' %}?tab=documents" class="dashboard-step__link">Revisar</a>
           {% endif %}
         </div>
       </li>

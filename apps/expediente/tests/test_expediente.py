@@ -44,6 +44,17 @@ class ExpedienteRulesTests(TestCase):
         self.assertEqual(self.expediente.pk, second.pk)
         self.assertEqual(Expediente.objects.filter(usuario=self.user).count(), 1)
 
+    def test_profile_contains_general_data_and_document_tabs(self):
+        set_tipo_persona(self.expediente, Expediente.TipoPersona.PERSONA_FISICA)
+        client = Client()
+        client.force_login(self.user)
+
+        response = client.get(reverse("expediente:profile"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Datos generales")
+        self.assertContains(response, "Documentos")
+
     def test_persona_fisica_requires_curp(self):
         set_tipo_persona(self.expediente, Expediente.TipoPersona.PERSONA_FISICA)
         with self.assertRaises(ValidationError):
@@ -145,6 +156,7 @@ class ExpedienteRulesTests(TestCase):
                 "apellido_paterno": "REAL",
                 "apellido_materno": "CALCANEO",
                 "correo_contacto": "original@example.com",
+                "curp": "RECS020207HTCLLNA4",
             },
             tipo_persona=Expediente.TipoPersona.CIUDADANO,
             identidad_oidc=True,
@@ -154,6 +166,20 @@ class ExpedienteRulesTests(TestCase):
         self.assertEqual(form.cleaned_data["apellido_paterno"], "REAL")
         self.assertEqual(form.cleaned_data["apellido_materno"], "CALCANEO")
         self.assertEqual(form.cleaned_data["correo_contacto"], "original@example.com")
+        self.assertEqual(form.cleaned_data["curp"], "RECS020207HTCLLNA4")
+
+    def test_oidc_person_type_ignores_posted_change(self):
+        from apps.expediente.forms import PersonTypeForm
+
+        form = PersonTypeForm(
+            data={"tipo_persona": Expediente.TipoPersona.PERSONA_MORAL},
+            initial={"tipo_persona": Expediente.TipoPersona.PERSONA_FISICA},
+            identidad_oidc=True,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            form.cleaned_data["tipo_persona"], Expediente.TipoPersona.PERSONA_FISICA
+        )
 
 
 class AdditionalFieldsTests(TestCase):
