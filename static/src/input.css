@@ -681,7 +681,7 @@
   }
 
   .auth-panel {
-    @apply relative z-10 order-2 flex min-h-0 w-full flex-1 flex-col overflow-y-auto overscroll-contain bg-primary-600 px-4 py-10 sm:px-8 lg:order-1 lg:max-w-[28rem] lg:flex-none lg:border-r lg:border-primary-700 xl:max-w-[32rem];
+    @apply relative z-10 order-2 flex min-h-0 w-full flex-1 flex-col overflow-y-auto overscroll-contain bg-white px-4 py-10 sm:px-8 lg:order-1 lg:max-w-[28rem] lg:flex-none lg:border-r lg:border-line xl:max-w-[32rem];
   }
 
   .auth-card {
@@ -730,11 +730,11 @@
   }
 
   .auth-title {
-    @apply text-3xl font-bold tracking-tight text-white sm:text-[2rem] sm:leading-tight;
+    @apply text-3xl font-bold tracking-tight text-secondary-900 sm:text-[2rem] sm:leading-tight;
   }
 
   .auth-lead {
-    @apply mt-2 text-base leading-relaxed text-white/70;
+    @apply mt-2 text-base leading-relaxed text-secondary-600;
   }
 
   .auth-submit {
