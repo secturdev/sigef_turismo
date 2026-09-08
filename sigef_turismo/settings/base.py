@@ -151,6 +151,7 @@ OIDC_RP_SIGN_ALGO = "RS256"
 OIDC_RP_SCOPES = "openid email profile"
 OIDC_STORE_ID_TOKEN = True
 OIDC_CREATE_USER = True
+OIDC_CALLBACK_CLASS = "apps.autenticacion.views.LlaveTabascoCallbackView"
 # Tolerancia de reloj OIDC (iat).
 OIDC_CLOCK_SKEW = env.int("OIDC_CLOCK_SKEW", default=120)
 # Diagnóstico de atributos recibidos desde Llave Tabasco. Se habilita por defecto

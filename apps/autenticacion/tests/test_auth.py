@@ -1,5 +1,5 @@
 from django.test import Client, TestCase
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from apps.autenticacion.models import Usuario
 from apps.autenticacion.oidc import LlaveTabascoOIDCBackend, _log_oidc_claims
@@ -45,30 +45,37 @@ class AuthTests(TestCase):
         self.assertIn('"roles": [', output)
         self.assertIn('"sub": "llave-123"', output)
 
-    def test_register_and_login_with_email(self):
+    def test_login_only_offers_llave_tabasco(self):
         client = Client()
-        reg = client.post(
-            reverse("autenticacion:register"),
-            {
-                "correo": "ciudadano@example.com",
-                "nombre_visible": "Ana",
-                "password1": "ClaveSegura123!",
-                "password2": "ClaveSegura123!",
-            },
-        )
-        self.assertEqual(reg.status_code, 302)
-        self.assertTrue(Usuario.objects.filter(correo="ciudadano@example.com").exists())
+        response = client.get(reverse("autenticacion:login"))
 
-        client.logout()
-        response = client.post(
-            reverse("autenticacion:login"),
-            {
-                "username": "ciudadano@example.com",
-                "password": "ClaveSegura123!",
-            },
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("oidc_authentication_init"))
+        self.assertNotContains(response, "password")
+        self.assertEqual(client.post(reverse("autenticacion:login")).status_code, 405)
+        with self.assertRaises(NoReverseMatch):
+            reverse("autenticacion:register")
+
+    def test_reused_oidc_callback_redirects_to_login(self):
+        client = Client()
+        session = client.session
+        session["oidc_states"] = {
+            "another-state": {"nonce": "nonce", "code_verifier": None}
+        }
+        session.save()
+
+        response = client.get(
+            reverse("oidc_authentication_callback"),
+            {"state": "already-used-state", "code": "already-used-code"},
+            HTTP_HOST="localhost:8000",
         )
+
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("expediente:dashboard"))
+        self.assertEqual(response.url, reverse("autenticacion:login"))
+        follow_up = client.get(
+            reverse("autenticacion:login"), HTTP_HOST="localhost:8000"
+        )
+        self.assertContains(follow_up, "ya fue utilizado o expiró")
 
     def test_oidc_claims_populate_general_data(self):
         claims = {

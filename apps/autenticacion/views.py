@@ -1,44 +1,47 @@
 from __future__ import annotations
 
 from django.contrib import messages
-from django.contrib.auth import login
-from django.contrib.auth.views import LoginView
+from django.core.exceptions import SuspiciousOperation
 from django.shortcuts import redirect
-from django.urls import reverse, reverse_lazy
 from django.views import View
-from django.views.generic import FormView
-from mozilla_django_oidc.views import OIDCLogoutView
+from django.views.generic import TemplateView
+from mozilla_django_oidc.views import (
+    OIDCAuthenticationCallbackView,
+    OIDCLogoutView,
+)
 
-from apps.expediente.services import get_or_create_expediente
 
-from .forms import EmailAuthenticationForm, RegisterForm
+OIDC_STATE_NOT_FOUND = "OIDC callback state not found in session `oidc_states`!"
 
 
-class RegisterView(FormView):
-    template_name = "autenticacion/register.html"
-    form_class = RegisterForm
-    success_url = reverse_lazy("expediente:dashboard")
+class LlaveTabascoCallbackView(OIDCAuthenticationCallbackView):
+    """Evita mostrar un error técnico al volver a un callback ya consumido."""
+
+    def get(self, request):
+        try:
+            return super().get(request)
+        except SuspiciousOperation as exc:
+            if str(exc) != OIDC_STATE_NOT_FOUND:
+                raise
+
+            if request.user.is_authenticated:
+                return redirect("expediente:dashboard")
+
+            messages.warning(
+                request,
+                "El acceso de Llave Tabasco ya fue utilizado o expiró. "
+                "Inicia sesión nuevamente.",
+            )
+            return redirect("autenticacion:login")
+
+
+class UserLoginView(TemplateView):
+    template_name = "autenticacion/login.html"
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
             return redirect("expediente:dashboard")
         return super().dispatch(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        user = form.save()
-        get_or_create_expediente(user)
-        login(self.request, user, backend="django.contrib.auth.backends.ModelBackend")
-        messages.success(self.request, "Cuenta creada. Completa tu expediente.")
-        return super().form_valid(form)
-
-
-class UserLoginView(LoginView):
-    template_name = "autenticacion/login.html"
-    authentication_form = EmailAuthenticationForm
-    redirect_authenticated_user = True
-
-    def get_success_url(self):
-        return reverse("expediente:dashboard")
 
 
 class UserLogoutView(OIDCLogoutView):
