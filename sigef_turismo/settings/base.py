@@ -56,6 +56,7 @@ PRIVATE_MEDIA_ROOT = BASE_DIR / "private_media"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.autenticacion.middleware.OIDCCanonicalOriginMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -155,6 +156,9 @@ OIDC_CLOCK_SKEW = env.int("OIDC_CLOCK_SKEW", default=120)
 # Diagnóstico de atributos recibidos desde Llave Tabasco. Se habilita por defecto
 # únicamente en desarrollo; puede controlarse con OIDC_LOG_CLAIMS=true/false.
 OIDC_LOG_CLAIMS = env.bool("OIDC_LOG_CLAIMS", default=env_name == "dev")
+# Origen público registrado en Llave Tabasco. Evita que el callback cambie
+# entre alias del mismo servidor (por ejemplo, localhost y 127.0.0.1).
+OIDC_CANONICAL_ORIGIN = env("OIDC_CANONICAL_ORIGIN", default="").rstrip("/")
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",

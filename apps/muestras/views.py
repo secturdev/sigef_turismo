@@ -13,7 +13,8 @@ from .services import get_or_create_solicitud, guardar_paso1, guardar_paso2
 
 
 def _datos_globales(user):
-    from apps.expediente.models import DatosGenerales, Expediente
+    from apps.expediente.models import DatosGenerales, Documento, Expediente, TipoDocumento
+    from apps.expediente.services import calculate_document_status
 
     try:
         expediente = user.expediente
@@ -42,12 +43,45 @@ def _datos_globales(user):
             ("CURP", getattr(datos, "curp", "") or "—"),
         ]
     campos.extend([
+        ("RFC", getattr(datos, "rfc", "") or "—"),
         ("Número de celular", getattr(datos, "telefono", "") or "—"),
         ("Correo electrónico", getattr(datos, "correo_contacto", "") or user.correo),
+        ("Domicilio", getattr(datos, "domicilio", "") or "—"),
     ])
+    documentos = []
+    for tipo in TipoDocumento.objects.filter(activo=True):
+        if expediente.tipo_persona and not tipo.aplica_a(expediente.tipo_persona):
+            continue
+        documento = Documento.objects.filter(
+            expediente=expediente, tipo_documento=tipo
+        ).select_related("version_actual").first()
+        version = documento.version_actual if documento else None
+        estado = calculate_document_status(version) if version else "PENDIENTE"
+        etiquetas_estado = {
+            "PENDIENTE": "Pendiente",
+            "VIGENTE": "Vigente",
+            "POR_VENCER": "Por vencer",
+            "VENCIDO": "Vencido",
+            "SIN_FECHA": "Cargado",
+        }
+        documentos.append({
+            "tipo": tipo,
+            "version": version,
+            "estado": estado,
+            "estado_label": etiquetas_estado[estado],
+        })
+    cargados = sum(1 for item in documentos if item["version"])
+    obligatorios_pendientes = sum(
+        1 for item in documentos if item["tipo"].obligatorio and not item["version"]
+    )
     return {
         "tipo_persona": expediente.get_tipo_persona_display() if expediente.tipo_persona else "—",
         "campos": campos,
+        "documentos": documentos,
+        "documentos_total": len(documentos),
+        "documentos_cargados": cargados,
+        "documentos_porcentaje": round(cargados * 100 / len(documentos)) if documentos else 100,
+        "documentos_obligatorios_pendientes": obligatorios_pendientes,
     }
 
 
@@ -66,7 +100,9 @@ class Paso1View(LoginRequiredMixin, FormView):
     def get_initial(self):
         return {
             "giro": self.solicitud.giro,
+            "subgiro": self.solicitud.subgiro,
             "programa_especial": self.solicitud.programa_especial,
+            "folio_programa_social": self.solicitud.folio_programa_social,
             "productos": self.solicitud.productos.all(),
             "mobiliario": self.solicitud.mobiliario.all(),
         }

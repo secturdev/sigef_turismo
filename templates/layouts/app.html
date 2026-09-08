@@ -1,24 +1,24 @@
-<!-- {% extends "_base.html" %}
+{% extends "_base.html" %}
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'src/app-overrides.css' %}" />
+<link rel="stylesheet" href="{% static 'src/app-overrides.css' %}" />
 {% endblock extra_css %}
 
 {% block body %}
-  <div class="app-shell" x-data="{ sidebarOpen: false }">
-    {% include "components/_sidebar.html" %}
+<div class="app-shell" x-data="{ sidebarOpen: false }">
+  {% include "components/_sidebar.html" %}
 
-    <div class="app-main">
-      {% include "components/_topbar.html" %}
+  <div class="app-main">
+    {% include "components/_topbar.html" %}
 
-      <main class="app-content {% block content_class %}{% endblock %}">
-        {% include "components/_messages.html" %}
-        {% block content %}{% endblock content %}
-      </main>
-    </div>
+    <main class="app-content {% block content_class %}{% endblock %}">
+      {% include "components/_messages.html" %}
+      {% block content %}{% endblock content %}
+    </main>
   </div>
-{% endblock body %} -->
+</div>
+{% endblock body %}
 <!-- <!DOCTYPE html>
 <html lang="es">
 

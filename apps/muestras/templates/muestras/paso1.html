@@ -22,11 +22,12 @@
 
   <div class="doc-list">
     {% if datos_globales %}
-      <section class="ui-panel">
+      <section class="ui-panel application-section">
         <div class="doc-card__head">
           <div>
-            <h2 class="panel-section__title">Expediente global</h2>
-            <p class="panel-section__lead">Datos que ya capturaste y se reutilizan en esta solicitud.</p>
+            <span class="application-section__number">1</span>
+            <h2 class="panel-section__title">Datos del expediente global</h2>
+            <p class="panel-section__lead">Verifica la información y documentos que se anexarán automáticamente.</p>
           </div>
         </div>
         <dl class="summary-list">
@@ -41,18 +42,67 @@
           </div>
           {% endfor %}
         </dl>
+        <div class="application-documents">
+          <div class="application-documents__header">
+            <div>
+              <span class="application-documents__eyebrow">Información vinculada</span>
+              <h3>Documentos del expediente</h3>
+              <p>Estos archivos se tomarán automáticamente. Para modificarlos debes hacerlo desde Mi perfil.</p>
+            </div>
+            <a class="btn-outline application-documents__manage" href="{% url 'expediente:profile' %}?tab=documents">Administrar documentos</a>
+          </div>
+          <div class="application-documents__progress">
+            <div>
+              <strong>{{ datos_globales.documentos_cargados }} de {{ datos_globales.documentos_total }}</strong>
+              <span>documentos disponibles</span>
+            </div>
+            <progress value="{{ datos_globales.documentos_cargados }}" max="{{ datos_globales.documentos_total|default:1 }}">{{ datos_globales.documentos_porcentaje }}%</progress>
+            {% if datos_globales.documentos_obligatorios_pendientes %}
+              <span class="application-documents__pending">{{ datos_globales.documentos_obligatorios_pendientes }} obligatorio{{ datos_globales.documentos_obligatorios_pendientes|pluralize }} pendiente{{ datos_globales.documentos_obligatorios_pendientes|pluralize }}</span>
+            {% else %}
+              <span class="application-documents__complete">Documentación obligatoria completa</span>
+            {% endif %}
+          </div>
+          <div class="application-documents__list">
+            {% for document in datos_globales.documentos %}
+              <article class="application-document is-{{ document.estado|lower }}">
+                <div class="application-document__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8m-6-6 6 6m-6-6v6h6" /></svg>
+                </div>
+                <div class="application-document__body">
+                  <div class="application-document__title">
+                    <strong>{{ document.tipo.nombre }}</strong>
+                    <span class="document-kind">{% if document.tipo.obligatorio %}Obligatorio{% else %}Opcional{% endif %}</span>
+                  </div>
+                  {% if document.version %}
+                    <span class="application-document__filename" title="{{ document.version.nombre_original }}">{{ document.version.nombre_original }}</span>
+                    <small>Cargado el {{ document.version.fecha_carga|date:"d/m/Y" }}{% if document.version.fecha_vencimiento %} · Vence {{ document.version.fecha_vencimiento|date:"d/m/Y" }}{% endif %}</small>
+                  {% else %}
+                    <span class="application-document__filename">Aún no se ha cargado un archivo</span>
+                    <small>Completa este documento en tu expediente global.</small>
+                  {% endif %}
+                </div>
+                <div class="application-document__actions">
+                  <span class="document-status">{{ document.estado_label }}</span>
+                  {% if document.version %}<a href="{% url 'expediente:download_version' document.version.pk %}">Abrir PDF</a>{% else %}<a href="{% url 'expediente:profile' %}?tab=documents">Subir archivo</a>{% endif %}
+                </div>
+              </article>
+            {% empty %}<p>No hay documentos configurados para este tipo de persona.</p>{% endfor %}
+          </div>
+        </div>
       </section>
     {% endif %}
 
-    <section class="ui-panel">
+    <section class="ui-panel application-section">
       <div class="doc-card__head">
         <div>
+          <span class="application-section__number">2</span>
           <h2 class="panel-section__title">Participación del comercio</h2>
-          <p class="panel-section__lead">Selecciona los elementos de tu catálogo que llevarás al evento.</p>
+          <p class="panel-section__lead">Completa la clasificación y selecciona lo que llevarás al evento.</p>
         </div>
       </div>
 
-      <form method="post" class="form-stack" novalidate>
+      <form method="post" enctype="multipart/form-data" class="form-stack" novalidate>
         {% csrf_token %}
         {% if form.non_field_errors %}
           <div class="ui-alert ui-alert--error">
@@ -72,9 +122,14 @@
           </div>
         {% endif %}
 
-        {% include "components/_form_field.html" with field=form.giro %}
+        <div class="application-subsection">
+          <div class="application-subsection__head"><span>01</span><div><h3>Perfil comercial</h3><p>Elige la categoría que mejor describa lo que vendes.</p></div></div>
+          <div class="application-classification">
+            {% include "components/_form_field.html" with field=form.giro %}
+            {% include "components/_form_field.html" with field=form.subgiro %}
+          </div>
 
-        <fieldset class="form-fieldset">
+        <fieldset class="form-fieldset social-program">
           <legend class="form-label">{{ form.programa_especial.label }}</legend>
           {% for radio in form.programa_especial %}
             <label class="choice-card">
@@ -85,30 +140,39 @@
           {% for error in form.programa_especial.errors %}
             <p class="form-error">{{ error }}</p>
           {% endfor %}
+          <div data-social-folio>{% include "components/_form_field.html" with field=form.folio_programa_social %}</div>
         </fieldset>
+        </div>
 
         {% if evento_info.categoria == "FERIA" %}
-          <fieldset class="event-requirements">
-            <legend>Equipamiento obligatorio para feria</legend>
-            <p>Indica las cantidades que tendrás disponibles durante todo el evento.</p>
+          <fieldset class="event-requirements application-subsection">
+            <legend><span>02</span> Equipamiento obligatorio</legend>
+            <p>Registra al menos un bote de basura y un extintor. Indica su nombre o modelo y agrega una foto clara.</p>
             <div class="event-requirements__grid">
               <div class="requirement-card">
                 <div class="requirement-card__icon" aria-hidden="true">♻</div>
                 {% include "components/_form_field.html" with field=form.cantidad_botes_basura %}
+                {% include "components/_form_field.html" with field=form.modelo_botes_basura %}
+                {% include "components/_form_field.html" with field=form.foto_botes_basura %}
+                {% if solicitud.foto_botes_basura %}<a class="requirement-card__current" href="{{ solicitud.foto_botes_basura.url }}" target="_blank" rel="noopener">Ver foto registrada</a>{% endif %}
                 <span>Obligatorio: mínimo 1</span>
               </div>
               <div class="requirement-card">
                 <div class="requirement-card__icon" aria-hidden="true">🧯</div>
                 {% include "components/_form_field.html" with field=form.cantidad_extintores %}
+                {% include "components/_form_field.html" with field=form.modelo_extintores %}
+                {% include "components/_form_field.html" with field=form.foto_extintores %}
+                {% if solicitud.foto_extintores %}<a class="requirement-card__current" href="{{ solicitud.foto_extintores.url }}" target="_blank" rel="noopener">Ver foto registrada</a>{% endif %}
                 <span>Obligatorio: mínimo 1</span>
               </div>
             </div>
           </fieldset>
         {% endif %}
 
-        <fieldset class="catalog-selection">
-          <legend>Productos que participarán</legend>
-          <p>Selecciona al menos un producto de tu catálogo.</p>
+        <fieldset class="catalog-selection application-subsection">
+          <legend><span>03</span> Productos que participarán</legend>
+          <p>Selecciona los productos. Al marcarlos podrás indicar existencias, precio, factura y cuál será el principal.</p>
+          {% for error in form.producto_principal.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
           <div class="participation-items">
             {% for row in form.product_rows %}
               <div class="participation-item">
@@ -119,6 +183,10 @@
                   <em>Seleccionar</em>
                 </label>
                 <div class="participation-item__fields">
+                  <label class="principal-product">
+                    <input type="radio" name="producto_principal" value="{{ row.item.pk }}" {% if form.producto_principal.value == row.item.pk|stringformat:"s" %}checked{% endif %} />
+                    <span><strong>Producto principal</strong><small>Será el producto destacado de tu participación.</small></span>
+                  </label>
                   {% include "components/_form_field.html" with field=row.stock %}
                   {% include "components/_form_field.html" with field=row.price %}
                   {% if row.invoice %}{% include "components/_form_field.html" with field=row.invoice %}{% endif %}
@@ -130,9 +198,9 @@
           </div>
         </fieldset>
 
-        <fieldset class="catalog-selection">
-          <legend>Mobiliario que utilizarás</legend>
-          <p>Opcional. Marca el mobiliario que necesitarás durante tu participación.</p>
+        <fieldset class="catalog-selection application-subsection">
+          <legend><span>04</span> Mobiliario que utilizarás</legend>
+          <p>Opcional. Selecciona mobiliario de tu catálogo e indica cantidad y factura cuando corresponda.</p>
           <div class="participation-items">
             {% for row in form.furniture_rows %}
               <div class="participation-item">
@@ -160,4 +228,5 @@
       </form>
     </section>
   </div>
+  <script src="{% static 'js/solicitudes/participacion.js' %}" defer></script>
 {% endblock content %}

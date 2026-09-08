@@ -36,9 +36,24 @@ def guardar_paso1(
 ) -> SolicitudMuestra:
     solicitud.nombre_comercio = (nombre_comercio or "").strip()
     solicitud.giro = data.get("giro") or ""
+    solicitud.subgiro = data.get("subgiro") or ""
     solicitud.programa_especial = data.get("programa_especial") or ""
+    solicitud.folio_programa_social = (
+        (data.get("folio_programa_social") or "").strip()
+        if solicitud.programa_especial != "NINGUNO" else ""
+    )
+    solicitud.producto_principal = next(
+        (row["item"] for row in productos if str(row["item"].pk) == str(data.get("producto_principal"))),
+        None,
+    )
     solicitud.cantidad_botes_basura = data.get("cantidad_botes_basura") or 0
     solicitud.cantidad_extintores = data.get("cantidad_extintores") or 0
+    solicitud.modelo_botes_basura = (data.get("modelo_botes_basura") or "").strip()
+    solicitud.modelo_extintores = (data.get("modelo_extintores") or "").strip()
+    if data.get("foto_botes_basura"):
+        solicitud.foto_botes_basura = data["foto_botes_basura"]
+    if data.get("foto_extintores"):
+        solicitud.foto_extintores = data["foto_extintores"]
     if not solicitud.nombre_comercio:
         raise ValidationError({"nombre_comercio": "El nombre de comercio es obligatorio."})
     if not solicitud.giro:

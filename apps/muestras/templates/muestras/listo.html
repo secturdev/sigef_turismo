@@ -23,12 +23,13 @@
       </div>
       <div>
         <dt>Giro</dt>
-        <dd>{{ solicitud.get_giro_display }}</dd>
+        <dd>{{ solicitud.get_giro_display }} · {{ solicitud.get_subgiro_display }}</dd>
       </div>
       <div>
         <dt>Programa especial</dt>
-        <dd>{{ solicitud.get_programa_especial_display }}</dd>
+        <dd>{{ solicitud.get_programa_especial_display }}{% if solicitud.folio_programa_social %} · Folio {{ solicitud.folio_programa_social }}{% endif %}</dd>
       </div>
+      <div><dt>Producto principal</dt><dd>{{ solicitud.producto_principal.nombre }}</dd></div>
       <div>
         <dt>Productos seleccionados</dt>
         <dd>{% for detail in solicitud.detalle_productos.all %}{{ detail.producto.nombre }}: {{ detail.stock_total }} unidades a ${{ detail.precio_venta }}{% if not forloop.last %}; {% endif %}{% endfor %}</dd>
@@ -38,8 +39,8 @@
         <dd>{% for detail in solicitud.detalle_mobiliario.all %}{{ detail.mobiliario.nombre }}: {{ detail.cantidad }}{% if not forloop.last %}; {% endif %}{% empty %}Ninguno{% endfor %}</dd>
       </div>
       {% if solicitud.cantidad_botes_basura %}
-        <div><dt>Botes de basura</dt><dd>{{ solicitud.cantidad_botes_basura }}</dd></div>
-        <div><dt>Extintores</dt><dd>{{ solicitud.cantidad_extintores }}</dd></div>
+        <div><dt>Botes de basura</dt><dd>{{ solicitud.cantidad_botes_basura }} · {{ solicitud.modelo_botes_basura }}</dd></div>
+        <div><dt>Extintores</dt><dd>{{ solicitud.cantidad_extintores }} · {{ solicitud.modelo_extintores }}</dd></div>
       {% endif %}
     </dl>
   </section>

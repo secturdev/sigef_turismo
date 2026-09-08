@@ -6,7 +6,7 @@ from pathlib import Path
 from django.conf import settings
 from django.db import models
 
-from .constants import GIROS, PROGRAMAS_ESPECIALES
+from .constants import GIROS, PROGRAMAS_ESPECIALES, SUBGIROS
 
 
 def _ruta_logo(instance, filename: str) -> str:
@@ -17,6 +17,11 @@ def _ruta_logo(instance, filename: str) -> str:
 def _ruta_imagen(instance, filename: str) -> str:
     ext = Path(filename).suffix.lower() or ".jpg"
     return f"muestras/{instance.solicitud.usuario_id}/imagenes/{uuid.uuid4().hex}{ext}"
+
+
+def _ruta_foto_equipamiento(instance, filename: str) -> str:
+    ext = Path(filename).suffix.lower() or ".jpg"
+    return f"muestras/{instance.usuario_id}/equipamiento/{uuid.uuid4().hex}{ext}"
 
 
 class SolicitudMuestra(models.Model):
@@ -33,12 +38,14 @@ class SolicitudMuestra(models.Model):
         choices=GIROS,
         blank=True,
     )
+    subgiro = models.CharField("subgiro", max_length=64, choices=SUBGIROS, blank=True)
     programa_especial = models.CharField(
         "programa especial",
         max_length=64,
         choices=PROGRAMAS_ESPECIALES,
         blank=True,
     )
+    folio_programa_social = models.CharField("folio del programa social", max_length=100, blank=True)
     logo = models.FileField(
         "logo del comercio",
         upload_to=_ruta_logo,
@@ -48,12 +55,24 @@ class SolicitudMuestra(models.Model):
     productos = models.ManyToManyField(
         "expediente.Producto", blank=True, related_name="solicitudes_muestra"
     )
+    producto_principal = models.ForeignKey(
+        "expediente.Producto", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="solicitudes_como_principal", verbose_name="producto principal",
+    )
     mobiliario = models.ManyToManyField(
         "expediente.Mobiliario", blank=True, related_name="solicitudes_muestra"
     )
     paso_actual = models.PositiveSmallIntegerField("paso actual", default=1)
     cantidad_botes_basura = models.PositiveIntegerField("cantidad de botes de basura", default=0)
     cantidad_extintores = models.PositiveIntegerField("cantidad de extintores", default=0)
+    modelo_botes_basura = models.CharField("modelo o nombre del bote de basura", max_length=150, blank=True)
+    modelo_extintores = models.CharField("modelo o nombre del extintor", max_length=150, blank=True)
+    foto_botes_basura = models.FileField(
+        "foto de los botes de basura", upload_to=_ruta_foto_equipamiento, blank=True
+    )
+    foto_extintores = models.FileField(
+        "foto de los extintores", upload_to=_ruta_foto_equipamiento, blank=True
+    )
     fecha_creacion = models.DateTimeField("fecha de creación", auto_now_add=True)
     fecha_actualizacion = models.DateTimeField("fecha de actualización", auto_now=True)
 
@@ -69,7 +88,10 @@ class SolicitudMuestra(models.Model):
         return bool(
             self.nombre_comercio
             and self.giro
+            and self.subgiro
             and self.programa_especial
+            and (self.programa_especial == "NINGUNO" or self.folio_programa_social)
+            and self.producto_principal_id
             and self.productos.exists()
         )
 
