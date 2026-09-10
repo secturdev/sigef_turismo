@@ -39,7 +39,7 @@ class OIDCCanonicalOriginMiddlewareTests(SimpleTestCase):
     @override_settings(OIDC_CANONICAL_ORIGIN="http://localhost:8000")
     def test_does_not_redirect_non_oidc_request(self):
         middleware = OIDCCanonicalOriginMiddleware(self.get_response)
-        request = self.factory.get("/login/", HTTP_HOST="127.0.0.1:8000")
+        request = self.factory.get("/inicio/", HTTP_HOST="127.0.0.1:8000")
 
         response = middleware(request)
 

@@ -1,14 +1,26 @@
 {% extends "layouts/auth.html" %}
+{% load static %}
 
 {% block title %}Iniciar sesión{% endblock %}
 
 {% block content %}
-  <div class="auth-header">
-    <h1 class="auth-title">Iniciar sesión</h1>
-    <p class="auth-lead">Accede o regístrate con tu cuenta de Llave Tabasco.</p>
+  <div class="auth-session">
+    <div class="auth-header">
+      <h1 class="auth-title">Iniciar sesión</h1>
+      <p class="auth-lead">Accede o regístrate con tu cuenta de Llave Tabasco.</p>
+    </div>
+
+    <a href="{% url 'oidc_authentication_init' %}" class="auth-llave">
+      Continuar con Llave Tabasco
+    </a>
   </div>
 
-  <a href="{% url 'oidc_authentication_init' %}" class="auth-llave">
-    Continuar con Llave Tabasco
-  </a>
+  <div class="auth-institution">
+    <img src="{% static 'img/brand/logo-turismo.png' %}"
+         alt="Gobierno del Pueblo — Secretaría de Turismo y Desarrollo Económico"
+         class="auth-institution__logo"
+         width="420"
+         height="102"
+         decoding="async" />
+  </div>
 {% endblock content %}
