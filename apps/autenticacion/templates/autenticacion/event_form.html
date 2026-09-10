@@ -1,0 +1,32 @@
+{% extends "layouts/admin.html" %}
+
+{% block title %}{{ form_title }}{% endblock %}
+
+{% block content %}
+  {% include "components/_page_header.html" with title=form_title subtitle=form_subtitle %}
+
+  <section class="ui-panel admin-create-panel">
+    <form method="post" enctype="multipart/form-data" class="form-stack" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="ui-alert ui-alert--error" role="alert">{{ form.non_field_errors.0 }}</div>
+      {% endif %}
+      {% include "components/_form_field.html" with field=form.boletab_eventos %}
+      {% include "components/_form_field.html" with field=form.nombre %}
+      {% include "components/_form_field.html" with field=form.descripcion %}
+      {% include "components/_form_field.html" with field=form.imagen %}
+      <div class="form-field {% if form.visible.errors %}has-error{% endif %}">
+        <label class="form-check-label" for="{{ form.visible.id_for_label }}">
+          {{ form.visible }}
+          <span>{{ form.visible.label }}</span>
+        </label>
+        {% if form.visible.help_text %}<p class="form-help">{{ form.visible.help_text }}</p>{% endif %}
+        {% for error in form.visible.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+      </div>
+      <div class="form-actions form-actions--split">
+        <a href="{% url 'autenticacion:admin_events' %}" class="btn-outline btn-lg">Cancelar</a>
+        <button type="submit" class="btn-primary btn-lg">{{ submit_label }}</button>
+      </div>
+    </form>
+  </section>
+{% endblock content %}

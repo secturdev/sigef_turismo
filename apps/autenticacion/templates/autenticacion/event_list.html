@@ -1,0 +1,48 @@
+{% extends "layouts/admin.html" %}
+
+{% block title %}Eventos{% endblock %}
+
+{% block content %}
+  <div class="admin-page-heading">
+    {% include "components/_page_header.html" with title="Eventos" subtitle="Consulta y administra los eventos registrados en SIGEF." %}
+    <a href="{% url 'autenticacion:admin_event_create' %}" class="btn-primary">Nuevo evento</a>
+  </div>
+
+  <section class="ui-panel">
+    <div class="admin-user-list">
+      {% for event in events %}
+        <article class="admin-event-row">
+          <img class="admin-event-row__image" src="{{ event.imagen.url }}" alt="" />
+          <div class="admin-event-row__body">
+            <p class="admin-user-row__name">{{ event.nombre }}</p>
+            <p class="admin-event-row__source">
+              Boletab:
+              {% for boletab_event in event.boletab_eventos %}
+                {{ boletab_event.name }}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                Sin relación
+              {% endfor %}
+            </p>
+            <p class="admin-user-row__email">{{ event.descripcion|truncatechars:100 }}</p>
+          </div>
+          <span class="admin-user-row__status {% if not event.visible %}is-hidden{% endif %}">
+            {% if event.visible %}Visible{% else %}Oculto{% endif %}
+          </span>
+          <div class="admin-event-row__actions">
+            {% if event.boletab_eventos %}
+              <a href="{% url 'autenticacion:admin_event_spaces' event.pk %}" class="btn-primary">Configurar espacios</a>
+            {% else %}
+              <span class="btn-outline is-disabled" title="Primero relaciona un evento de Boletab">Configurar espacios</span>
+            {% endif %}
+            <a href="{% url 'autenticacion:admin_event_update' event.pk %}" class="btn-outline">Editar</a>
+          </div>
+        </article>
+      {% empty %}
+        <div class="admin-empty-state">
+          <p>No hay eventos registrados.</p>
+          <a href="{% url 'autenticacion:admin_event_create' %}" class="btn-primary">Crear el primer evento</a>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock content %}

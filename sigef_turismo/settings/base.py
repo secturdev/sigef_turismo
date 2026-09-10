@@ -161,6 +161,11 @@ OIDC_LOG_CLAIMS = env.bool("OIDC_LOG_CLAIMS", default=env_name == "dev")
 # entre alias del mismo servidor (por ejemplo, localhost y 127.0.0.1).
 OIDC_CANONICAL_ORIGIN = env("OIDC_CANONICAL_ORIGIN", default="").rstrip("/")
 
+# Catálogo externo de eventos de Boletab.
+BOLETAB_BASE_URL = env("BOLETAB_BASE_URL", default="").rstrip("/")
+BOLETAB_API_KEY = env("BOLETAB_API_KEY", default="")
+BOLETAB_TIMEOUT = env.int("BOLETAB_TIMEOUT", default=15)
+
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",

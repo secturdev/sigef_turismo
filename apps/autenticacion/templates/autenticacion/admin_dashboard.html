@@ -1,0 +1,12 @@
+{% extends "layouts/admin.html" %}
+
+{% block title %}Panel de administración{% endblock %}
+
+{% block content %}
+  {% include "components/_page_header.html" with title="Panel administrativo" subtitle="Gestiona los accesos y la operación de SIGEF." %}
+  <section class="ui-panel admin-summary">
+    <p class="admin-summary__label">Administradores registrados</p>
+    <p class="admin-summary__value">{{ admin_count }}</p>
+    <a href="{% url 'autenticacion:admin_users' %}" class="btn-primary">Dar de alta un administrador</a>
+  </section>
+{% endblock content %}

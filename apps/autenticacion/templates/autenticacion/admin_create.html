@@ -1,0 +1,41 @@
+{% extends "layouts/admin.html" %}
+
+{% block title %}Usuarios administradores{% endblock %}
+
+{% block content %}
+  {% include "components/_page_header.html" with title="Usuarios administradores" subtitle="Registra cuentas con acceso al panel administrativo." %}
+
+  <section class="ui-panel admin-create-panel">
+    <h2 class="admin-section-title">Dar de alta un administrador</h2>
+    <form method="post" class="form-stack" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="ui-alert ui-alert--error" role="alert">{{ form.non_field_errors.0 }}</div>
+      {% endif %}
+      {% include "components/_form_field.html" with field=form.nombre_visible %}
+      {% include "components/_form_field.html" with field=form.correo %}
+      {% include "components/_form_field.html" with field=form.password %}
+      {% include "components/_form_field.html" with field=form.password_confirmation %}
+      <div class="form-actions">
+        <button type="submit" class="btn-primary btn-lg">Crear administrador</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="ui-panel admin-list-panel">
+    <h2 class="admin-section-title">Administradores registrados</h2>
+    <div class="admin-user-list">
+      {% for admin in admin_users %}
+        <article class="admin-user-row">
+          <div>
+            <p class="admin-user-row__name">{{ admin.nombre_visible|default:"Sin nombre" }}</p>
+            <p class="admin-user-row__email">{{ admin.correo }}</p>
+          </div>
+          <span class="admin-user-row__status">{% if admin.is_active %}Activo{% else %}Inactivo{% endif %}</span>
+        </article>
+      {% empty %}
+        <p>No hay administradores registrados.</p>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock content %}
