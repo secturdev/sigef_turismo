@@ -21,6 +21,7 @@
   color: #475569;
 }
 
+
 .choice-card:has(input:disabled) {
   cursor: not-allowed;
   border-color: #cbd5e1;

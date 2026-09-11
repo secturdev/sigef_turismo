@@ -1,4 +1,6 @@
 import json
+import re
+import unicodedata
 
 from django import forms
 from django.contrib.auth import authenticate
@@ -116,11 +118,13 @@ class EventCreateForm(forms.ModelForm):
         widget=forms.SelectMultiple(attrs={"size": 7}),
         help_text="Puedes seleccionar varios eventos manteniendo presionada la tecla Ctrl.",
     )
+    catalogo_giros = forms.CharField(required=False, widget=forms.HiddenInput)
 
     class Meta:
         model = Evento
         fields = (
             "boletab_eventos",
+            "catalogo_giros",
             "nombre",
             "descripcion",
             "imagen",
@@ -148,6 +152,9 @@ class EventCreateForm(forms.ModelForm):
             self.initial["boletab_eventos"] = [
                 event["id"] for event in self.instance.boletab_eventos
             ]
+            self.initial["catalogo_giros"] = json.dumps(
+                self.instance.catalogo_giros or self._legacy_catalog(), ensure_ascii=False
+            )
         for name, field in self.fields.items():
             field.widget.attrs["class"] = (
                 "form-checkbox" if name == "visible" else "form-input"
@@ -160,12 +167,70 @@ class EventCreateForm(forms.ModelForm):
             raise forms.ValidationError("El archivo seleccionado debe ser una imagen.")
         return imagen
 
+    @staticmethod
+    def _key(value):
+        value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
+        return re.sub(r"[^A-Z0-9]+", "_", value.upper()).strip("_")
+
+    def _legacy_catalog(self):
+        giros = self.data.getlist("giros_disponibles") if self.is_bound else self.instance.giros_disponibles
+        selected = self.data.getlist("subgiros_disponibles") if self.is_bound else self.instance.subgiros_disponibles
+        return [{
+            "id": giro, "nombre": dict(GIROS).get(giro, giro), "descripcion": "Descripción pendiente",
+            "subgiros": [{"id": sid, "nombre": dict(SUBGIROS_POR_GIRO.get(giro, [])).get(sid, sid), "descripcion": "Descripción pendiente"}
+                         for sid in selected if sid in dict(SUBGIROS_POR_GIRO.get(giro, []))],
+        } for giro in giros]
+
+    def clean_catalogo_giros(self):
+        raw = self.cleaned_data.get("catalogo_giros")
+        if not raw and self.is_bound:
+            giros = set(self.data.getlist("giros_disponibles"))
+            valid_subgiros = {sid for giro in giros for sid, _ in SUBGIROS_POR_GIRO.get(giro, [])}
+            if set(self.data.getlist("subgiros_disponibles")) - valid_subgiros:
+                raise forms.ValidationError("Cada subgiro debe corresponder a uno de los giros seleccionados.")
+        try:
+            catalog = json.loads(raw) if raw else self._legacy_catalog()
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise forms.ValidationError("El catálogo de giros no es válido.") from exc
+        if not isinstance(catalog, list) or not catalog:
+            raise forms.ValidationError("Agrega al menos un giro.")
+        result, used_giros = [], set()
+        for giro in catalog:
+            if not isinstance(giro, dict):
+                raise forms.ValidationError("La información de un giro no es válida.")
+            nombre, descripcion = str(giro.get("nombre") or "").strip(), str(giro.get("descripcion") or "").strip()
+            if not nombre or not descripcion:
+                raise forms.ValidationError("Cada giro debe tener nombre y descripción.")
+            giro_id = self._key(str(giro.get("id") or nombre))
+            if not giro_id or giro_id in used_giros:
+                raise forms.ValidationError("Los nombres de los giros deben ser diferentes.")
+            used_giros.add(giro_id)
+            subgiros, used_subgiros = [], set()
+            for subgiro in giro.get("subgiros") or []:
+                if not isinstance(subgiro, dict):
+                    raise forms.ValidationError("La información de un subgiro no es válida.")
+                subnombre, subdescripcion = str(subgiro.get("nombre") or "").strip(), str(subgiro.get("descripcion") or "").strip()
+                if not subnombre or not subdescripcion:
+                    raise forms.ValidationError("Cada subgiro debe tener nombre y descripción.")
+                subgiro_id = self._key(str(subgiro.get("id") or subnombre))
+                if not subgiro_id or subgiro_id in used_subgiros:
+                    raise forms.ValidationError(f'Los subgiros de "{nombre}" deben tener nombres diferentes.')
+                used_subgiros.add(subgiro_id)
+                subgiros.append({"id": subgiro_id, "nombre": subnombre, "descripcion": subdescripcion})
+            if not subgiros:
+                raise forms.ValidationError(f'Agrega al menos un subgiro al giro "{nombre}".')
+            result.append({"id": giro_id, "nombre": nombre, "descripcion": descripcion, "subgiros": subgiros})
+        return result
+
     def save(self, commit=True):
         event = super().save(commit=False)
         selected_ids = set(self.cleaned_data["boletab_eventos"])
         event.boletab_eventos = [
             item for item in self.boletab_events if item["id"] in selected_ids
         ]
+        event.catalogo_giros = self.cleaned_data["catalogo_giros"]
+        event.giros_disponibles = [giro["id"] for giro in event.catalogo_giros]
+        event.subgiros_disponibles = [subgiro["id"] for giro in event.catalogo_giros for subgiro in giro["subgiros"]]
         if commit:
             event.save()
         return event
@@ -183,8 +248,9 @@ class SpaceRuleForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, catalog=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.catalog = catalog
         self.fields["folios"].widget.attrs["x-model"] = "selected.foliosText"
 
     def clean_reglas_json(self):
@@ -196,7 +262,7 @@ class SpaceRuleForm(forms.Form):
         if not isinstance(rules, list):
             raise forms.ValidationError("Las reglas enviadas no son válidas.")
 
-        valid_giros = dict(GIROS)
+        valid_giros = ({giro["id"]: giro for giro in self.catalog} if self.catalog else dict(GIROS))
         cleaned = []
         for rule in rules:
             if not isinstance(rule, dict):
@@ -205,7 +271,8 @@ class SpaceRuleForm(forms.Form):
             subgiro = str(rule.get("subgiro") or "")
             if giro not in valid_giros:
                 raise forms.ValidationError("Selecciona un giro válido en cada regla.")
-            valid_subgiros = dict(SUBGIROS_POR_GIRO.get(giro, []))
+            valid_subgiros = ({item["id"]: item for item in valid_giros[giro]["subgiros"]}
+                              if self.catalog else dict(SUBGIROS_POR_GIRO.get(giro, [])))
             if subgiro and subgiro not in valid_subgiros:
                 raise forms.ValidationError("El subgiro no corresponde al giro seleccionado.")
             normalized = {"giro": giro, "subgiro": subgiro}

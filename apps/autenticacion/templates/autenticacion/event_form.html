@@ -3,30 +3,170 @@
 {% block title %}{{ form_title }}{% endblock %}
 
 {% block content %}
-  {% include "components/_page_header.html" with title=form_title subtitle=form_subtitle %}
+{% include "components/_page_header.html" with title=form_title subtitle=form_subtitle %}
 
-  <section class="ui-panel admin-create-panel">
-    <form method="post" enctype="multipart/form-data" class="form-stack" novalidate>
-      {% csrf_token %}
-      {% if form.non_field_errors %}
-        <div class="ui-alert ui-alert--error" role="alert">{{ form.non_field_errors.0 }}</div>
-      {% endif %}
-      {% include "components/_form_field.html" with field=form.boletab_eventos %}
-      {% include "components/_form_field.html" with field=form.nombre %}
-      {% include "components/_form_field.html" with field=form.descripcion %}
-      {% include "components/_form_field.html" with field=form.imagen %}
-      <div class="form-field {% if form.visible.errors %}has-error{% endif %}">
-        <label class="form-check-label" for="{{ form.visible.id_for_label }}">
-          {{ form.visible }}
-          <span>{{ form.visible.label }}</span>
-        </label>
-        {% if form.visible.help_text %}<p class="form-help">{{ form.visible.help_text }}</p>{% endif %}
-        {% for error in form.visible.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+<section class="ui-panel admin-create-panel">
+  <form method="post" enctype="multipart/form-data" class="form-stack" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="ui-alert ui-alert--error" role="alert">{{ form.non_field_errors.0 }}</div>
+    {% endif %}
+    {% include "components/_form_field.html" with field=form.boletab_eventos %}
+    <p id="boletab-events-status" class="form-help" role="status" aria-live="polite"></p>
+    {{ form.catalogo_giros }}
+    <div class="form-field {% if form.catalogo_giros.errors %}has-error{% endif %}">
+      <div class="catalog-heading">
+        <div>
+          <span class="form-label">Giros y subgiros</span>
+          <p class="form-help">Registra cada giro y agrega sus subgiros con una descripción individual.</p>
+        </div>
+        <button type="button" class="btn-outline" id="add-giro">Agregar giro</button>
       </div>
-      <div class="form-actions form-actions--split">
-        <a href="{% url 'autenticacion:admin_events' %}" class="btn-outline btn-lg">Cancelar</a>
-        <button type="submit" class="btn-primary btn-lg">{{ submit_label }}</button>
-      </div>
-    </form>
-  </section>
+      <div id="giros-editor" class="catalog-list"></div>
+      {% for error in form.catalogo_giros.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+    </div>
+    {% include "components/_form_field.html" with field=form.nombre %}
+    {% include "components/_form_field.html" with field=form.descripcion %}
+    {% include "components/_form_field.html" with field=form.imagen %}
+    <div class="form-field {% if form.visible.errors %}has-error{% endif %}">
+      <label class="form-check-label" for="{{ form.visible.id_for_label }}">
+        {{ form.visible }}
+        <span>{{ form.visible.label }}</span>
+      </label>
+      {% if form.visible.help_text %}<p class="form-help">{{ form.visible.help_text }}</p>{% endif %}
+      {% for error in form.visible.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+    </div>
+    <div class="form-actions form-actions--split">
+      <a href="{% url 'autenticacion:admin_events' %}" class="btn-outline btn-lg">Cancelar</a>
+      <button type="submit" class="btn-primary btn-lg">{{ submit_label }}</button>
+    </div>
+  </form>
+</section>
 {% endblock content %}
+
+{% block extra_js %}
+{{ selected_boletab_event_ids|json_script:"selected-boletab-events" }}
+<script>
+  const statusAvailableEvents = 'PUBLICADO';
+  const isEventEdit = {{ is_event_edit|yesno:"true,false" }};
+
+  const catalogInput = document.getElementById('id_catalogo_giros');
+  const catalogEditor = document.getElementById('giros-editor');
+  let giros = [];
+  try { giros = JSON.parse(catalogInput.value || '[]'); } catch (_) { giros = []; }
+  if (!Array.isArray(giros) || !giros.length) giros = [{ nombre: '', descripcion: '', subgiros: [{ nombre: '', descripcion: '' }] }];
+
+  function syncCatalog() { catalogInput.value = JSON.stringify(giros); }
+  function field(label, value, placeholder, onInput, textarea = false) {
+    const wrap = document.createElement('label');
+    wrap.className = 'catalog-field';
+    const caption = document.createElement('span');
+    caption.className = 'form-label'; caption.textContent = label;
+    const input = document.createElement(textarea ? 'textarea' : 'input');
+    input.className = 'form-input'; input.value = value || ''; input.placeholder = placeholder;
+    if (textarea) input.rows = 2;
+    input.required = true;
+    input.addEventListener('input', event => { onInput(event.target.value); syncCatalog(); });
+    wrap.append(caption, input); return wrap;
+  }
+  function action(label, className, handler) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = className; button.textContent = label;
+    button.addEventListener('click', handler); return button;
+  }
+  function renderCatalog() {
+    catalogEditor.replaceChildren();
+    giros.forEach((giro, giroIndex) => {
+      const card = document.createElement('article'); card.className = 'catalog-card';
+      const head = document.createElement('div'); head.className = 'catalog-card__head';
+      const title = document.createElement('h3'); title.textContent = `Giro ${giroIndex + 1}`;
+      head.append(title, action('Eliminar giro', 'catalog-remove', () => { giros.splice(giroIndex, 1); renderCatalog(); }));
+      const grid = document.createElement('div'); grid.className = 'catalog-grid';
+      grid.append(
+        field('Nombre del giro', giro.nombre, 'Ej. Artesanías', value => giro.nombre = value),
+        field('Descripción del giro', giro.descripcion, 'Describe las actividades de este giro', value => giro.descripcion = value, true)
+      );
+      const subtitle = document.createElement('h4'); subtitle.className = 'catalog-subtitle'; subtitle.textContent = 'Subgiros';
+      const list = document.createElement('div'); list.className = 'subgiro-list';
+      (giro.subgiros || []).forEach((subgiro, subIndex) => {
+        const row = document.createElement('div'); row.className = 'subgiro-row';
+        row.append(
+          field('Nombre del subgiro', subgiro.nombre, 'Ej. Textiles', value => subgiro.nombre = value),
+          field('Descripción del subgiro', subgiro.descripcion, 'Describe este subgiro', value => subgiro.descripcion = value, true),
+          action('Eliminar', 'catalog-remove', () => { giro.subgiros.splice(subIndex, 1); renderCatalog(); })
+        ); list.append(row);
+      });
+      const addSub = action('Agregar subgiro', 'btn-outline catalog-add-sub', () => {
+        giro.subgiros = giro.subgiros || []; giro.subgiros.push({ nombre: '', descripcion: '' }); renderCatalog();
+      });
+      card.append(head, grid, subtitle, list, addSub); catalogEditor.append(card);
+    });
+    syncCatalog();
+  }
+  document.getElementById('add-giro').addEventListener('click', () => {
+    giros.push({ nombre: '', descripcion: '', subgiros: [{ nombre: '', descripcion: '' }] }); renderCatalog();
+  });
+  renderCatalog();
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    const select = document.getElementById('id_boletab_eventos');
+    const status = document.getElementById('boletab-events-status');
+    if (!select || !status) return;
+
+    const initialValue = JSON.parse(
+      document.getElementById('selected-boletab-events').textContent
+    );
+    const selectedIds = new Set(
+      (Array.isArray(initialValue) ? initialValue : [initialValue])
+        .filter(Boolean)
+        .map(String)
+    );
+
+    select.disabled = true;
+    status.textContent = 'Consultando eventos de Boletab...';
+    try {
+      const response = await fetch('{{ boletab_events_api_url|escapejs }}', {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'No fue posible consultar los eventos de Boletab.');
+      }
+
+      /*
+       * Al crear solo se permiten eventos publicados. Al editar se muestran
+       * todos para no perder de vista relaciones realizadas anteriormente.
+       */
+
+      const events = isEventEdit
+        ? (data.events || [])
+        : (data.events || []).filter(
+          event => event.estado === statusAvailableEvents
+        );
+
+      select.replaceChildren();
+
+      for (const event of events) {
+        const isSelected = selectedIds.has(String(event.id));
+
+        const option = new Option(
+          event.name,
+          event.id,
+          false,
+          isSelected
+        );
+
+        select.add(option);
+      }
+      status.textContent = events.length
+        ? `${events.length} eventos disponibles en Boletab.`
+        : 'Boletab no devolvió eventos disponibles.';
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      select.disabled = false;
+    }
+  });
+</script>
+{% endblock extra_js %}

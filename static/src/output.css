@@ -78,6 +78,8 @@
     }
 }
 
+.catalog-heading,.catalog-card__head{display:flex;align-items:center;justify-content:space-between;gap:1rem}.catalog-list,.subgiro-list{display:grid;gap:1rem}.catalog-card{border:1px solid var(--color-line,#d8dee8);border-radius:.75rem;padding:1.25rem;background:#f8fafc}.catalog-card__head h3,.catalog-subtitle{margin:0;font-weight:700;color:#1e293b}.catalog-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:1rem;margin-top:1rem}.catalog-field{display:flex;flex-direction:column;gap:.375rem}.catalog-subtitle{margin-top:1.25rem;margin-bottom:.75rem}.subgiro-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto;gap:.75rem;align-items:end;padding:1rem;border-radius:.5rem;background:#fff}.catalog-remove{border:0;background:0 0;color:#b42318;font-weight:600;cursor:pointer;padding:.5rem}.catalog-add-sub{margin-top:1rem}@media(max-width:700px){.catalog-grid,.subgiro-row{grid-template-columns:1fr}.catalog-heading{align-items:flex-start}}
+
 @layer theme {
 
     :root,
@@ -2729,7 +2731,7 @@
         }
 
         .form-actions--split {
-            justify-content: space-between
+            justify-content: end
         }
     }
 
@@ -3736,8 +3738,7 @@
     }
 
     .space-toolbar {
-        justify-content: space-between;
-        gap: calc(var(--spacing) * 4);
+        gap: calc(var(--spacing) * 3);
         border-bottom-style: var(--tw-border-style);
         border-bottom-width: 1px;
         border-color: var(--color-line);
@@ -3746,16 +3747,20 @@
         display: flex
     }
 
+    .space-event-selector {
+        width: 100%;
+        gap: calc(var(--spacing) * 4);
+        display: grid
+    }
+
     @media (min-width:40rem) {
-        .space-toolbar {
-            flex-direction: row;
-            align-items: flex-end
+        .space-event-selector {
+            grid-template-columns: repeat(2, minmax(0, 1fr))
         }
     }
 
-    .space-event-selector {
-        width: 100%;
-        max-width: var(--container-xl)
+    .space-event-selector>div {
+        min-width: 0
     }
 
     .space-event-selector .form-label {
@@ -3766,7 +3771,6 @@
     .space-toolbar__summary {
         font-size: var(--text-sm);
         line-height: var(--tw-leading, var(--text-sm--line-height));
-        white-space: nowrap;
         color: var(--color-secondary-600)
     }
 

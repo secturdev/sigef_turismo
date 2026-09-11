@@ -4,6 +4,9 @@ from django.db import models
 
 class Evento(models.Model):
     boletab_eventos = models.JSONField("eventos de Boletab", default=list, blank=True)
+    catalogo_giros = models.JSONField(default=list, blank=True)
+    giros_disponibles = models.JSONField(default=list, blank=True)
+    subgiros_disponibles = models.JSONField(default=list, blank=True)
     nombre = models.CharField(max_length=180)
     descripcion = models.TextField()
     imagen = models.FileField(

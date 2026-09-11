@@ -112,6 +112,8 @@ class AuthTests(TestCase):
                 reverse("autenticacion:admin_event_create"),
                 {
                     "boletab_eventos": ["81", "82"],
+                    "giros_disponibles": ["ARTESANIAS", "TURISMO_EXPERIENCIAS"],
+                    "subgiros_disponibles": ["TEXTILES", "TOURS"],
                     "nombre": "Festival de prueba",
                     "descripcion": "Descripción del evento.",
                     "imagen": image,
@@ -130,6 +132,10 @@ class AuthTests(TestCase):
             ],
         )
         self.assertEqual(event.descripcion, "Descripción del evento.")
+        self.assertEqual(
+            event.giros_disponibles, ["ARTESANIAS", "TURISMO_EXPERIENCIAS"]
+        )
+        self.assertEqual(event.subgiros_disponibles, ["TEXTILES", "TOURS"])
 
     def test_admin_can_update_event(self):
         admin = Usuario.objects.create_superuser(
@@ -152,6 +158,8 @@ class AuthTests(TestCase):
                 reverse("autenticacion:admin_event_update", args=[event.pk]),
                 {
                     "boletab_eventos": ["81"],
+                    "giros_disponibles": ["ARTESANIAS"],
+                    "subgiros_disponibles": ["TEXTILES"],
                     "nombre": "Nombre actualizado",
                     "descripcion": "Descripción actualizada",
                     "visible": True,
@@ -162,6 +170,92 @@ class AuthTests(TestCase):
         event.refresh_from_db()
         self.assertEqual(event.nombre, "Nombre actualizado")
         self.assertTrue(event.visible)
+        self.assertEqual(event.giros_disponibles, ["ARTESANIAS"])
+        self.assertEqual(event.subgiros_disponibles, ["TEXTILES"])
+
+    def test_admin_can_create_event_with_described_giro_catalog(self):
+        admin = Usuario.objects.create_superuser(
+            correo="catalog-editor@example.com", password="TemporaryOwner01"
+        )
+        self.client.force_login(admin)
+        image = SimpleUploadedFile("evento.png", b"image-content", content_type="image/png")
+        catalog = [{
+            "nombre": "Artesanías regionales",
+            "descripcion": "Productos elaborados por artesanos locales.",
+            "subgiros": [{
+                "nombre": "Textiles bordados",
+                "descripcion": "Prendas y accesorios bordados a mano.",
+            }],
+        }]
+        with (
+            tempfile.TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+            patch("apps.autenticacion.views.get_boletab_events", return_value=[{"id": "81", "name": "Evento Boletab"}]),
+        ):
+            response = self.client.post(reverse("autenticacion:admin_event_create"), {
+                "boletab_eventos": ["81"], "catalogo_giros": json.dumps(catalog),
+                "nombre": "Evento con catálogo", "descripcion": "Descripción", "imagen": image,
+            })
+        self.assertRedirects(response, reverse("autenticacion:admin_events"))
+        event = Evento.objects.get(nombre="Evento con catálogo")
+        self.assertEqual(event.catalogo_giros[0]["id"], "ARTESANIAS_REGIONALES")
+        self.assertEqual(event.catalogo_giros[0]["subgiros"][0]["descripcion"], "Prendas y accesorios bordados a mano.")
+
+    def test_admin_can_fetch_boletab_events_as_json(self):
+        admin = Usuario.objects.create_superuser(
+            correo="catalog-fetch@example.com", password="TemporaryOwner01"
+        )
+        self.client.force_login(admin)
+
+        with patch(
+            "apps.autenticacion.views.get_boletab_events",
+            return_value=[{"id": "61", "name": "Evento Boletab"}],
+        ):
+            response = self.client.get(
+                reverse("autenticacion:admin_boletab_events_data")
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"events": [{"id": "61", "name": "Evento Boletab"}]},
+        )
+
+    def test_event_rejects_subgiro_from_unselected_giro(self):
+        admin = Usuario.objects.create_superuser(
+            correo="catalog@example.com", password="TemporaryOwner01"
+        )
+        self.client.force_login(admin)
+        image = SimpleUploadedFile(
+            "evento.png", b"image-content", content_type="image/png"
+        )
+
+        with (
+            tempfile.TemporaryDirectory() as media_root,
+            override_settings(MEDIA_ROOT=media_root),
+            patch(
+                "apps.autenticacion.views.get_boletab_events",
+                return_value=[{"id": "81", "name": "Evento Boletab"}],
+            ),
+        ):
+            response = self.client.post(
+                reverse("autenticacion:admin_event_create"),
+                {
+                    "boletab_eventos": ["81"],
+                    "giros_disponibles": ["ARTESANIAS"],
+                    "subgiros_disponibles": ["TOURS"],
+                    "nombre": "Evento inválido",
+                    "descripcion": "Descripción",
+                    "imagen": image,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Cada subgiro debe corresponder a uno de los giros seleccionados.",
+        )
+        self.assertFalse(Evento.objects.filter(nombre="Evento inválido").exists())
 
     def test_regular_user_cannot_open_event_management(self):
         user = Usuario.objects.create_user(
@@ -184,6 +278,13 @@ class AuthTests(TestCase):
             imagen="eventos/existing.png",
         )
         self.client.force_login(admin)
+
+        page_response = self.client.get(
+            reverse("autenticacion:admin_event_spaces", args=[event.pk])
+        )
+        self.assertEqual(page_response.status_code, 200)
+        self.assertContains(page_response, "Configuración de espacios")
+        self.assertContains(page_response, "Evento Boletab")
 
         with patch(
             "apps.autenticacion.views.get_boletab_places",
@@ -211,14 +312,16 @@ class AuthTests(TestCase):
             ],
         ):
             response = self.client.get(
-                reverse("autenticacion:admin_event_spaces", args=[event.pk])
+                reverse("autenticacion:admin_event_spaces_data", args=[event.pk]),
+                {"evento": "61"},
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Configuración de espacios")
-        self.assertContains(response, "Evento Boletab")
-        self.assertContains(response, "175,292 202,292 202,315 175,315")
-        self.assertContains(response, "Hacienda 1")
+        payload = response.json()
+        self.assertEqual(payload["places"][0]["asientoId"], 59349)
+        self.assertEqual(payload["places"][0]["etiqueta"], "Hacienda 1")
+        self.assertEqual(payload["configured_count"], 0)
+        self.assertEqual(payload["view_box"]["width"], 100)
 
     def test_spaces_view_redirects_when_event_has_no_boletab_relation(self):
         admin = Usuario.objects.create_superuser(
@@ -239,6 +342,37 @@ class AuthTests(TestCase):
             response,
             reverse("autenticacion:admin_event_update", args=[event.pk]),
         )
+
+    def test_admin_can_fetch_sections_for_linked_boletab_event(self):
+        admin = Usuario.objects.create_superuser(
+            correo="sections@example.com", password="TemporaryOwner01"
+        )
+        event = Evento.objects.create(
+            boletab_eventos=[{"id": "61", "name": "Evento Boletab"}],
+            nombre="Evento con secciones",
+            descripcion="Descripción",
+            imagen="eventos/existing.png",
+        )
+        self.client.force_login(admin)
+
+        with patch(
+            "apps.autenticacion.views.get_boletab_sections",
+            return_value=[
+                {
+                    "id": 376,
+                    "nombre": "Chocolaterías y Bebidas",
+                    "tipo": "POLIGONOS",
+                    "totalLugares": 9,
+                }
+            ],
+        ):
+            response = self.client.get(
+                reverse("autenticacion:admin_event_sections_data", args=[event.pk]),
+                {"evento": "61"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["sections"][0]["id"], 376)
 
     def test_admin_can_save_eligibility_rules_for_space(self):
         admin = Usuario.objects.create_superuser(

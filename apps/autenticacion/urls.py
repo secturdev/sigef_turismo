@@ -28,6 +28,11 @@ urlpatterns = [
         name="admin_event_create",
     ),
     path(
+        "administracion/eventos/boletab/datos/",
+        views.BoletabEventsDataView.as_view(),
+        name="admin_boletab_events_data",
+    ),
+    path(
         "administracion/eventos/<int:pk>/editar/",
         views.EventUpdateView.as_view(),
         name="admin_event_update",
@@ -36,6 +41,16 @@ urlpatterns = [
         "administracion/eventos/<int:pk>/espacios/",
         views.EventSpacesView.as_view(),
         name="admin_event_spaces",
+    ),
+    path(
+        "administracion/eventos/<int:pk>/espacios/datos/",
+        views.EventSpacesDataView.as_view(),
+        name="admin_event_spaces_data",
+    ),
+    path(
+        "administracion/eventos/<int:pk>/espacios/secciones/",
+        views.EventSectionsDataView.as_view(),
+        name="admin_event_sections_data",
     ),
     path(
         "administracion/logout/",

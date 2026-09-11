@@ -5,244 +5,367 @@
 {% block content_class %}app-content--spaces{% endblock %}
 
 {% block content %}
-  <div class="admin-page-heading">
-    {% include "components/_page_header.html" with title="Configuración de espacios" subtitle=event.nombre %}
-    <a href="{% url 'autenticacion:admin_events' %}" class="btn-outline">Volver a eventos</a>
+<div class="admin-page-heading">
+  {% include "components/_page_header.html" with title="Configuración de espacios" subtitle=event.nombre %}
+  <a href="{% url 'autenticacion:admin_events' %}" class="btn-outline">Volver a eventos</a>
+</div>
+
+{{ rule_catalog|json_script:"space-rule-catalog" }}
+{{ event.boletab_eventos|json_script:"linked-boletab-events" }}
+<section class="space-workspace"
+  x-data="spaceMap('{{ sections_api_url|escapejs }}', '{{ spaces_api_url|escapejs }}', '{{ selected_boletab_event_id|escapejs }}', JSON.parse(document.getElementById('space-rule-catalog').textContent), JSON.parse(document.getElementById('linked-boletab-events').textContent))"
+  x-init="loadSections()">
+  <div class="space-toolbar">
+    <div class="space-event-selector">
+      <div>
+        <label class="form-label" for="boletab-event">Eventos</label>
+        <select id="boletab-event" class="form-input" x-model="eventId" @change="loadSections()"
+          :disabled="!linkedEvents.length">
+          <template x-for="boletabEvent in linkedEvents" :key="boletabEvent.id">
+            <option :value="String(boletabEvent.id)" x-text="boletabEvent.name"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="boletab-section">Sección</label>
+        <select id="boletab-section" class="form-input" x-model="sectionId" @change="loadPlaces()"
+          :disabled="!sections.length">
+          <template x-for="section in sections" :key="section.id">
+            <option :value="String(section.id)" x-text="`${section.nombre} (${section.totalLugares || 0})`"></option>
+          </template>
+        </select>
+      </div>
+    </div>
+    <div class="space-toolbar__summary">
+      Total: <strong x-text="placeList.length"></strong> espacios ·
+      <strong x-text="configuredCount"></strong> configurados
+    </div>
   </div>
 
-  {{ places_data|json_script:"space-map-data" }}
-  {{ rule_catalog|json_script:"space-rule-catalog" }}
-  {{ view_box_data|json_script:"space-view-box" }}
-  <section class="space-workspace" x-data="spaceMap(JSON.parse(document.getElementById('space-map-data').textContent), JSON.parse(document.getElementById('space-rule-catalog').textContent), JSON.parse(document.getElementById('space-view-box').textContent))">
-    <div class="space-toolbar">
-      <form method="get" class="space-event-selector">
-        <label class="form-label" for="boletab-event">Evento de Boletab</label>
-        <select id="boletab-event" name="evento" class="form-input" onchange="this.form.submit()">
-          {% for boletab_event in event.boletab_eventos %}
-            <option value="{{ boletab_event.id }}" {% if boletab_event.id == selected_boletab_event_id %}selected{% endif %}>
-              {{ boletab_event.name }}
-            </option>
-          {% endfor %}
-        </select>
-      </form>
-      <div class="space-toolbar__summary">
-        <strong>{{ places|length }}</strong> espacios · <strong>{{ configured_count }}</strong> configurados
-      </div>
-    </div>
-
-    <div class="space-map-layout">
-      <div class="space-map-canvas">
-        {% if places %}
-          <div class="space-map-controls" aria-label="Controles del mapa">
-            <button type="button" @click="zoom(0.8)" title="Acercar" aria-label="Acercar">+</button>
-            <button type="button" @click="zoom(1.25)" title="Alejar" aria-label="Alejar">&minus;</button>
-            <button type="button" @click="resetView()" title="Restablecer vista" aria-label="Restablecer vista">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M20 20v-6h-6M5.5 15a7 7 0 0 0 11.2 2M18.5 9A7 7 0 0 0 7.3 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
-            </button>
-          </div>
-          <p class="space-map-hint">Rueda para zoom · Arrastra para moverte</p>
-          <svg class="space-map" :class="{ 'is-panning': panning }" viewBox="{{ view_box }}"
-               x-effect="$el.setAttribute('viewBox', currentViewBox)"
-               preserveAspectRatio="xMidYMid meet" aria-label="Mapa de espacios"
-               @wheel.prevent="wheelZoom($event)"
-               @pointerdown="startPan($event)"
-               @pointermove.window="movePan($event)"
-               @pointerup.window="endPan()"
-               @pointercancel.window="endPan()">
-            <defs>
-              {% for place in places %}
-                <clipPath id="space-clip-{{ place.asientoId }}">
-                  <polygon points="{{ place.points }}"></polygon>
-                </clipPath>
-              {% endfor %}
-            </defs>
-            {% for place in places %}
-              <g class="space-place {% if not place.habilitado %}is-disabled{% endif %} {% if place.estado != 'DISPONIBLE' %}is-unavailable{% endif %}"
-                 tabindex="0" role="button"
-                 @click="selectPlace('{{ place.asientoId }}')">
-                <polygon points="{{ place.points }}" fill="{{ place.color }}">
-                  <title>{{ place.etiqueta }} · {{ place.estado }}</title>
-                </polygon>
-                <text x="{{ place.posX|stringformat:'g' }}"
-                      font-size="{{ place.labelFontSize|stringformat:'g' }}"
-                      clip-path="url(#space-clip-{{ place.asientoId }})">
-                  {% for line in place.labelLines %}
-                    <tspan x="{{ place.posX|stringformat:'g' }}" y="{{ line.y|stringformat:'g' }}">{{ line.text }}</tspan>
-                  {% endfor %}
-                </text>
-              </g>
-            {% endfor %}
+  <div class="space-map-layout">
+    <div class="space-map-canvas">
+      <div class="space-map-controls" aria-label="Controles del mapa" x-show="placeList.length">
+        <button type="button" @click="zoom(0.8)" title="Acercar" aria-label="Acercar">+</button>
+        <button type="button" @click="zoom(1.25)" title="Alejar" aria-label="Alejar">&minus;</button>
+        <button type="button" @click="resetView()" title="Restablecer vista" aria-label="Restablecer vista">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 4v6h6M20 20v-6h-6M5.5 15a7 7 0 0 0 11.2 2M18.5 9A7 7 0 0 0 7.3 7" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           </svg>
-        {% else %}
-          <div class="space-map-empty">No se encontraron lugares para este evento.</div>
-        {% endif %}
+        </button>
       </div>
-
-      <aside class="space-detail">
-        <template x-if="!selected">
-          <div class="space-detail__empty">
-            <h2>Detalle del espacio</h2>
-            <p>Selecciona un espacio en el mapa para consultar su información.</p>
-          </div>
-        </template>
-        <template x-if="selected">
-          <div>
-            <span class="space-source-card__label">Espacio seleccionado</span>
-            <h2 class="space-detail__title" x-text="selected.etiqueta || 'Sin etiqueta'"></h2>
-            <dl class="space-detail__list">
-              <div><dt>Sección</dt><dd x-text="selected.seccionNombre || '—'"></dd></div>
-              <div><dt>Tipo</dt><dd x-text="selected.seccionTipo || '—'"></dd></div>
-              <div><dt>Fila / número</dt><dd x-text="(selected.fila || '—') + ' / ' + (selected.numero || '—')"></dd></div>
-              <div><dt>Categoría</dt><dd x-text="selected.categoriaNombre || '—'"></dd></div>
-              <div><dt>Estado</dt><dd x-text="selected.estado || '—'"></dd></div>
-              <div><dt>Precio</dt><dd x-text="selected.precio != null ? '$' + Number(selected.precio).toLocaleString('es-MX', {minimumFractionDigits: 2}) : 'Sin precio'"></dd></div>
-              <div><dt>ID Boletab</dt><dd x-text="selected.asientoId"></dd></div>
-            </dl>
-
-            <div class="space-rule-summary">
-              <div>
-                <span>Giros</span>
-                <strong x-text="selected.rules.reglas.length || 'Todos'"></strong>
-              </div>
-              <div>
-                <span>Subgiros</span>
-                <strong x-text="selected.rules.reglas.filter(rule => rule.subgiro).length || 'Todos'"></strong>
-              </div>
-              <div>
-                <span>Folios</span>
-                <strong x-text="selected.rules.folios.length || 'Todos'"></strong>
-              </div>
-            </div>
-            <div class="space-inline-rules">
-              <div class="space-rule-group__heading">
-                <h3>Reglas de elegibilidad</h3>
-                <button type="button" class="btn-outline" @click="addRule()">Agregar regla</button>
-              </div>
-              <p class="form-help">Cada regla relaciona un giro con uno de sus subgiros.</p>
-              <form method="post" class="space-rule-form">
-                {% csrf_token %}
-                <input type="hidden" name="boletab_evento_id" value="{{ selected_boletab_event_id }}" />
-                <input type="hidden" name="asiento_id" :value="selected.asientoId" />
-                <input type="hidden" name="etiqueta" :value="selected.etiqueta" />
-                <input type="hidden" name="reglas_json" :value="JSON.stringify(selected.rules.reglas)" />
-                <div class="space-rule-builder">
-                  <template x-for="(rule, index) in selected.rules.reglas" :key="index">
-                    <div class="space-rule-row">
-                      <div class="form-field">
-                        <label class="form-label">Giro</label>
-                        <select class="form-input" x-model="rule.giro"
-                                x-effect="$nextTick(() => { $el.value = rule.giro })"
-                                @change="rule.subgiro = ''" required>
-                          <option value="">Selecciona un giro</option>
-                          <template x-for="giro in catalog.giros" :key="giro.id">
-                            <option :value="giro.id" :selected="rule.giro === giro.id" x-text="giro.name"></option>
-                          </template>
-                        </select>
-                      </div>
-                      <div class="form-field">
-                        <label class="form-label">Subgiro</label>
-                        <select class="form-input" x-model="rule.subgiro"
-                                x-effect="$nextTick(() => { $el.value = rule.subgiro })"
-                                :disabled="!rule.giro">
-                          <option value="">Cualquier subgiro</option>
-                          <template x-for="subgiro in subgirosFor(rule.giro)" :key="subgiro.id">
-                            <option :value="subgiro.id" :selected="rule.subgiro === subgiro.id" x-text="subgiro.name"></option>
-                          </template>
-                        </select>
-                      </div>
-                      <button type="button" class="space-rule-row__remove" @click="removeRule(index)" aria-label="Eliminar regla">&times;</button>
-                    </div>
-                  </template>
-                  <p class="space-rule-builder__empty" x-show="selected.rules.reglas.length === 0">Sin reglas: cualquier giro y subgiro puede elegir este espacio.</p>
-                </div>
-                <div class="form-field">
-                  <label class="form-label" for="space-folios">Folios permitidos</label>
-                  <textarea id="space-folios" name="folios" class="form-input" rows="3" x-model="selected.foliosText" placeholder="Un folio por línea"></textarea>
-                </div>
-                <button type="submit" class="btn-primary w-full">Guardar reglas</button>
-              </form>
-            </div>
-          </div>
-        </template>
-      </aside>
+      <p class="space-map-hint">Rueda para zoom · Arrastra para moverte</p>
+      <svg class="space-map" x-show="placeList.length" :class="{ 'is-panning': panning }"
+        x-effect="$el.setAttribute('viewBox', currentViewBox)" preserveAspectRatio="xMidYMid meet"
+        aria-label="Mapa de espacios" @wheel.prevent="wheelZoom($event)" @pointerdown="startPan($event)"
+        @pointermove.window="movePan($event)" @pointerup.window="endPan()" @pointercancel.window="endPan()"
+        @click="selectPlaceFromEvent($event)" @keydown.enter="selectPlaceFromEvent($event)"
+        x-html="placesSvg">
+      </svg>
+      <div class="space-map-empty" x-show="!loading && !error && !placeList.length">No se encontraron lugares para este evento.</div>
+      <div class="space-map-empty" x-show="error" x-text="error"></div>
     </div>
-  </section>
+
+    <aside class="space-detail">
+      <template x-if="!selected">
+        <div class="space-detail__empty">
+          <h2>Detalle del espacio</h2>
+          <p>Selecciona un espacio en el mapa para consultar su información.</p>
+        </div>
+      </template>
+      <template x-if="selected">
+        <div>
+          <span class="space-source-card__label">Espacio seleccionado</span>
+          <h2 class="space-detail__title" x-text="selected.etiqueta || 'Sin etiqueta'"></h2>
+          <dl class="space-detail__list">
+            <div>
+              <dt>Sección</dt>
+              <dd x-text="selected.seccionNombre || '—'"></dd>
+            </div>
+            <div>
+              <dt>Tipo</dt>
+              <dd x-text="selected.seccionTipo || '—'"></dd>
+            </div>
+            <div>
+              <dt>Fila / número</dt>
+              <dd x-text="(selected.fila || '—') + ' / ' + (selected.numero || '—')"></dd>
+            </div>
+            <div>
+              <dt>Categoría</dt>
+              <dd x-text="selected.categoriaNombre || '—'"></dd>
+            </div>
+            <div>
+              <dt>Estado</dt>
+              <dd x-text="selected.estado || '—'"></dd>
+            </div>
+            <div>
+              <dt>Precio</dt>
+              <dd
+                x-text="selected.precio != null ? '$' + Number(selected.precio).toLocaleString('es-MX', {minimumFractionDigits: 2}) : 'Sin precio'">
+              </dd>
+            </div>
+            <div>
+              <dt>ID Boletab</dt>
+              <dd x-text="selected.asientoId"></dd>
+            </div>
+          </dl>
+
+          <!-- REGLAS DE ELEGIBILIDAD PARA ESPACIOS -->
+          <div class="space-rule-summary">
+            <div>
+              <span>Giros</span>
+              <strong x-text="selected.rules.reglas.length || 'Todos'"></strong>
+            </div>
+            <div>
+              <span>Subgiros</span>
+              <strong x-text="selected.rules.reglas.filter(rule => rule.subgiro).length || 'Todos'"></strong>
+            </div>
+            <div>
+              <span>Folios</span>
+              <strong x-text="selected.rules.folios.length || 'Todos'"></strong>
+            </div>
+          </div>
+          <!-- REGLAS DE ELEGIBILIDAD PARA ESPACIOS -->
+          <div class="space-inline-rules">
+            <div class="space-rule-group__heading">
+              <h3>Reglas de elegibilidad</h3>
+              <button type="button" class="btn-outline" @click="addRule()">Agregar regla</button>
+            </div>
+            <p class="form-help">Cada regla relaciona un giro con uno de sus subgiros.</p>
+            <form method="post" class="space-rule-form">
+              {% csrf_token %}
+              <input type="hidden" name="boletab_evento_id" :value="eventId" />
+              <input type="hidden" name="asiento_id" :value="selected.asientoId" />
+              <input type="hidden" name="etiqueta" :value="selected.etiqueta" />
+              <input type="hidden" name="reglas_json" :value="JSON.stringify(selected.rules.reglas)" />
+              <div class="space-rule-builder">
+                <template x-for="(rule, index) in selected.rules.reglas" :key="index">
+                  <div class="space-rule-row">
+                    <div class="form-field">
+                      <label class="form-label">Giro</label>
+                      <select class="form-input" x-model="rule.giro"
+                        x-effect="$nextTick(() => { $el.value = rule.giro })" @change="rule.subgiro = ''" required>
+                        <option value="">Selecciona un giro</option>
+                        <template x-for="giro in catalog.giros" :key="giro.id">
+                          <option :value="giro.id" :selected="rule.giro === giro.id" x-text="giro.name"></option>
+                        </template>
+                      </select>
+                    </div>
+                    <div class="form-field">
+                      <label class="form-label">Subgiro</label>
+                      <select class="form-input" x-model="rule.subgiro"
+                        x-effect="$nextTick(() => { $el.value = rule.subgiro })" :disabled="!rule.giro">
+                        <option value="">Cualquier subgiro</option>
+                        <template x-for="subgiro in subgirosFor(rule.giro)" :key="subgiro.id">
+                          <option :value="subgiro.id" :selected="rule.subgiro === subgiro.id" x-text="subgiro.name">
+                          </option>
+                        </template>
+                      </select>
+                    </div>
+                    <button type="button" class="space-rule-row__remove" @click="removeRule(index)"
+                      aria-label="Eliminar regla">&times;</button>
+                  </div>
+                </template>
+                <p class="space-rule-builder__empty" x-show="selected.rules.reglas.length === 0">Sin reglas: cualquier
+                  giro y subgiro puede elegir este espacio.</p>
+              </div>
+              <div class="form-field">
+                <label class="form-label" for="space-folios">Folios permitidos</label>
+                <textarea id="space-folios" name="folios" class="form-input" rows="3" x-model="selected.foliosText"
+                  placeholder="Un folio por línea"></textarea>
+              </div>
+              <button type="submit" class="btn-primary w-full">Guardar reglas</button>
+            </form>
+          </div>
+        </div>
+      </template>
+    </aside>
+  </div>
+</section>
 {% endblock content %}
 
 {% block extra_js %}
-  <script>
-    function spaceMap(places, catalog, initialViewBox) {
-      return {
-        catalog,
-        places: Object.fromEntries(places.map(place => [String(place.asientoId), place])),
-        selected: null,
-        baseViewBox: {...initialViewBox},
-        viewBox: {...initialViewBox},
-        panning: false,
-        panMoved: false,
-        panStart: null,
-        get currentViewBox() {
-          return `${this.viewBox.x} ${this.viewBox.y} ${this.viewBox.width} ${this.viewBox.height}`;
-        },
-        selectPlace(id) {
-          if (this.panMoved) {
-            this.panMoved = false;
-            return;
+<script>
+  window.spaceMap = function spaceMap(sectionsApiUrl, apiUrl, initialEventId, catalog, linkedEvents) {
+    const emptyViewBox = { x: 0, y: 0, width: 1000, height: 700 };
+    return {
+      apiUrl,
+      sectionsApiUrl,
+      eventId: initialEventId,
+      linkedEvents,
+      sections: [],
+      sectionId: '',
+      catalog,
+      places: {},
+      placeList: [],
+      configuredCount: 0,
+      loading: false,
+      error: '',
+      selected: null,
+      baseViewBox: { ...emptyViewBox },
+      viewBox: { ...emptyViewBox },
+      panning: false,
+      panMoved: false,
+      panStart: null,
+      get currentViewBox() {
+        return `${this.viewBox.x} ${this.viewBox.y} ${this.viewBox.width} ${this.viewBox.height}`;
+      },
+      get placesSvg() {
+        const escape = value => String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+
+        return this.placeList.map(place => {
+          const classes = [
+            'space-place',
+            !place.habilitado ? 'is-disabled' : '',
+            place.estado !== 'DISPONIBLE' ? 'is-unavailable' : ''
+          ].filter(Boolean).join(' ');
+          const lines = (place.labelLines || []).map(line =>
+            `<tspan x="${escape(place.posX)}" y="${escape(line.y)}">${escape(line.text)}</tspan>`
+          ).join('');
+          return `<g class="${classes}" data-space-id="${escape(place.asientoId)}" tabindex="0" role="button">
+            <polygon points="${escape(place.points)}" fill="${escape(place.color)}">
+              <title>${escape(place.etiqueta)} · ${escape(place.estado)}</title>
+            </polygon>
+            <text x="${escape(place.posX)}" font-size="${escape(place.labelFontSize)}">${lines}</text>
+          </g>`;
+        }).join('');
+      },
+      async loadSections() {
+        this.loading = true;
+        this.error = '';
+        this.sections = [];
+        this.sectionId = '';
+        this.placeList = [];
+        this.places = {};
+        this.selected = null;
+        try {
+          const url = new URL(this.sectionsApiUrl, window.location.origin);
+          url.searchParams.set('evento', this.eventId);
+          const response = await fetch(url, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'No fue posible consultar las secciones.');
+
+          this.sections = data.sections || [];
+          if (this.sections.length) {
+            this.sectionId = String(this.sections[0].id);
+            await this.loadPlaces();
           }
-          const place = this.places[String(id)];
-          this.selected = {
-            ...place,
-            rules: {
-              reglas: (place.rules.reglas || []).map(rule => ({...rule})),
-              giros: [...place.rules.giros],
-              subgiros: [...place.rules.subgiros],
-              folios: [...place.rules.folios]
-            },
-            foliosText: place.rules.folios.join('\n')
-          };
-        },
-        addRule() { this.selected.rules.reglas.push({giro: '', subgiro: ''}); },
-        removeRule(index) { this.selected.rules.reglas.splice(index, 1); },
-        subgirosFor(giro) { return this.catalog.subgiros[giro] || []; },
-        resetView() { this.viewBox = {...this.baseViewBox}; },
-        zoom(factor, anchorX = 0.5, anchorY = 0.5) {
-          const minWidth = this.baseViewBox.width * 0.08;
-          const maxWidth = this.baseViewBox.width * 8;
-          const newWidth = Math.min(maxWidth, Math.max(minWidth, this.viewBox.width * factor));
-          const ratio = newWidth / this.viewBox.width;
-          const newHeight = this.viewBox.height * ratio;
-          this.viewBox = {
-            x: this.viewBox.x + (this.viewBox.width - newWidth) * anchorX,
-            y: this.viewBox.y + (this.viewBox.height - newHeight) * anchorY,
-            width: newWidth,
-            height: newHeight
-          };
-        },
-        wheelZoom(event) {
-          const rect = event.currentTarget.getBoundingClientRect();
-          const anchorX = (event.clientX - rect.left) / rect.width;
-          const anchorY = (event.clientY - rect.top) / rect.height;
-          this.zoom(event.deltaY < 0 ? 0.85 : 1.18, anchorX, anchorY);
-        },
-        startPan(event) {
-          if (event.button !== 0) return;
-          this.panning = true;
+        } catch (error) {
+          this.error = error.message;
+        } finally {
+          this.loading = false;
+        }
+      },
+      async loadPlaces() {
+        this.loading = true;
+        this.error = '';
+        this.selected = null;
+        try {
+          const url = new URL(this.apiUrl, window.location.origin);
+          url.searchParams.set('evento', this.eventId);
+          url.searchParams.set('seccion', this.sectionId);
+          const response = await fetch(url, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'No fue posible consultar los espacios.');
+
+          this.placeList = data.places || [];
+          this.places = Object.fromEntries(
+            this.placeList.map(place => [String(place.asientoId), place])
+          );
+          this.configuredCount = data.configured_count || 0;
+          this.baseViewBox = { ...(data.view_box || emptyViewBox) };
+          this.resetView();
+
+          const pageUrl = new URL(window.location.href);
+          pageUrl.searchParams.set('evento', this.eventId);
+          window.history.replaceState({}, '', pageUrl);
+        } catch (error) {
+          this.placeList = [];
+          this.places = {};
+          this.configuredCount = 0;
+          this.error = error.message;
+        } finally {
+          this.loading = false;
+        }
+      },
+      selectPlace(id) {
+        if (this.panMoved) {
           this.panMoved = false;
-          this.panStart = {x: event.clientX, y: event.clientY};
-        },
-        movePan(event) {
-          if (!this.panning || !this.panStart) return;
-          const svg = this.$root.querySelector('.space-map');
-          const rect = svg.getBoundingClientRect();
-          const dx = event.clientX - this.panStart.x;
-          const dy = event.clientY - this.panStart.y;
-          if (Math.abs(dx) + Math.abs(dy) > 3) this.panMoved = true;
-          this.viewBox.x -= dx * this.viewBox.width / rect.width;
-          this.viewBox.y -= dy * this.viewBox.height / rect.height;
-          this.panStart = {x: event.clientX, y: event.clientY};
-        },
-        endPan() { this.panning = false; this.panStart = null; }
-      };
-    }
-  </script>
+          return;
+        }
+        const place = this.places[String(id)];
+        this.selected = {
+          ...place,
+          rules: {
+            reglas: (place.rules.reglas || []).map(rule => ({ ...rule })),
+            giros: [...place.rules.giros],
+            subgiros: [...place.rules.subgiros],
+            folios: [...place.rules.folios]
+          },
+          foliosText: place.rules.folios.join('\n')
+        };
+      },
+      selectPlaceFromEvent(event) {
+        const element = event.target.closest('[data-space-id]');
+        if (element) this.selectPlace(element.dataset.spaceId);
+      },
+      addRule() { this.selected.rules.reglas.push({ giro: '', subgiro: '' }); },
+      removeRule(index) { this.selected.rules.reglas.splice(index, 1); },
+      subgirosFor(giro) { return this.catalog.subgiros[giro] || []; },
+      resetView() { this.viewBox = { ...this.baseViewBox }; },
+      zoom(factor, anchorX = 0.5, anchorY = 0.5) {
+        const minWidth = this.baseViewBox.width * 0.08;
+        const maxWidth = this.baseViewBox.width * 8;
+        const newWidth = Math.min(maxWidth, Math.max(minWidth, this.viewBox.width * factor));
+        const ratio = newWidth / this.viewBox.width;
+        const newHeight = this.viewBox.height * ratio;
+        this.viewBox = {
+          x: this.viewBox.x + (this.viewBox.width - newWidth) * anchorX,
+          y: this.viewBox.y + (this.viewBox.height - newHeight) * anchorY,
+          width: newWidth,
+          height: newHeight
+        };
+      },
+      wheelZoom(event) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const anchorX = (event.clientX - rect.left) / rect.width;
+        const anchorY = (event.clientY - rect.top) / rect.height;
+        this.zoom(event.deltaY < 0 ? 0.85 : 1.18, anchorX, anchorY);
+      },
+      startPan(event) {
+        if (event.button !== 0) return;
+        this.panning = true;
+        this.panMoved = false;
+        this.panStart = { x: event.clientX, y: event.clientY };
+      },
+      movePan(event) {
+        if (!this.panning || !this.panStart) return;
+        const svg = this.$root.querySelector('.space-map');
+        const rect = svg.getBoundingClientRect();
+        const dx = event.clientX - this.panStart.x;
+        const dy = event.clientY - this.panStart.y;
+        if (Math.abs(dx) + Math.abs(dy) > 3) this.panMoved = true;
+        this.viewBox.x -= dx * this.viewBox.width / rect.width;
+        this.viewBox.y -= dy * this.viewBox.height / rect.height;
+        this.panStart = { x: event.clientX, y: event.clientY };
+      },
+      endPan() { this.panning = false; this.panStart = null; }
+    };
+  };
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('spaceMap', window.spaceMap);
+  });
+</script>
 {% endblock extra_js %}

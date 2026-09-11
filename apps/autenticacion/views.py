@@ -6,7 +6,9 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import SuspiciousOperation
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, TemplateView, UpdateView
 from django.contrib.auth.views import LogoutView
@@ -23,6 +25,7 @@ from apps.landingpage.boletab import (
     BoletabError,
     get_boletab_events,
     get_boletab_places,
+    get_boletab_sections,
 )
 
 
@@ -142,15 +145,23 @@ class EventCreateView(UserPassesTestMixin, FormView):
         context["form_title"] = "Crear evento"
         context["form_subtitle"] = "Captura la información del nuevo evento."
         context["submit_label"] = "Crear evento"
+        context["is_event_edit"] = False
+        context["boletab_events_api_url"] = reverse(
+            "autenticacion:admin_boletab_events_data"
+        )
+        context["selected_boletab_event_ids"] = (
+            context["form"]["boletab_eventos"].value() or []
+        )
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        try:
-            kwargs["boletab_events"] = get_boletab_events()
-        except BoletabError as exc:
-            kwargs["boletab_events"] = []
-            messages.error(self.request, str(exc))
+        kwargs["boletab_events"] = []
+        if self.request.method == "POST":
+            try:
+                kwargs["boletab_events"] = get_boletab_events()
+            except BoletabError as exc:
+                messages.error(self.request, str(exc))
         return kwargs
 
     def form_valid(self, form):
@@ -174,15 +185,23 @@ class EventUpdateView(UserPassesTestMixin, UpdateView):
         context["form_title"] = "Editar evento"
         context["form_subtitle"] = "Actualiza la información y visibilidad del evento."
         context["submit_label"] = "Guardar cambios"
+        context["is_event_edit"] = True
+        context["boletab_events_api_url"] = reverse(
+            "autenticacion:admin_boletab_events_data"
+        )
+        context["selected_boletab_event_ids"] = (
+            context["form"]["boletab_eventos"].value() or []
+        )
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        try:
-            kwargs["boletab_events"] = get_boletab_events()
-        except BoletabError as exc:
-            kwargs["boletab_events"] = self.object.boletab_eventos
-            messages.error(self.request, str(exc))
+        kwargs["boletab_events"] = self.object.boletab_eventos
+        if self.request.method == "POST":
+            try:
+                kwargs["boletab_events"] = get_boletab_events()
+            except BoletabError as exc:
+                messages.error(self.request, str(exc))
         return kwargs
 
     def form_valid(self, form):
@@ -191,6 +210,21 @@ class EventUpdateView(UserPassesTestMixin, UpdateView):
         return redirect("autenticacion:admin_events")
 
 
+class BoletabEventsDataView(UserPassesTestMixin, View):
+    login_url = "autenticacion:admin_login"
+
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.is_staff
+
+    def get(self, request):
+        try:
+            events = get_boletab_events()
+        except BoletabError as exc:
+            return JsonResponse({"error": str(exc)}, status=502)
+        return JsonResponse({"events": events})
+
+
+# VISTA DE EVENTOS DE ESPACIOS
 class EventSpacesView(UserPassesTestMixin, TemplateView):
     template_name = "autenticacion/event_spaces.html"
     login_url = "autenticacion:admin_login"
@@ -219,67 +253,27 @@ class EventSpacesView(UserPassesTestMixin, TemplateView):
             selected_id = linked_events[0]["id"]
             messages.warning(self.request, "El evento de Boletab seleccionado no está vinculado.")
 
-        places = []
-        try:
-            places = get_boletab_places(selected_id)
-        except BoletabError as exc:
-            messages.error(self.request, str(exc))
-
-        rules = {
-            rule.asiento_id: rule
-            for rule in ReglaEspacio.objects.filter(
-                evento=self.event, boletab_evento_id=selected_id
-            )
-        }
-        configured_count = 0
-        for place in places:
-            rule = rules.get(str(place.get("asientoId")))
-            place["rules"] = {
-                "reglas": rule.reglas if rule else [],
-                "giros": rule.giros if rule else [],
-                "subgiros": rule.subgiros if rule else [],
-                "folios": rule.folios if rule else [],
-            }
-            if rule:
-                configured_count += 1
-
-        coordinates = [point for place in places for point in place["coordinates"]]
-        if coordinates:
-            xs = [point[0] for point in coordinates]
-            ys = [point[1] for point in coordinates]
-            padding = 30
-            min_x, min_y = min(xs) - padding, min(ys) - padding
-            width = max(max(xs) - min(xs) + 2 * padding, 100)
-            height = max(max(ys) - min(ys) + 2 * padding, 100)
-        else:
-            min_x, min_y, width, height = 0, 0, 1000, 700
-
         context["selected_boletab_event_id"] = selected_id
-        context["places"] = places
-        context["places_data"] = places
-        context["configured_count"] = configured_count
-        context["rule_form"] = SpaceRuleForm()
-        context["giro_choices"] = GIROS
-        context["subgiro_groups"] = SUBGIROS
-        context["rule_catalog"] = {
+        context["spaces_api_url"] = reverse(
+            "autenticacion:admin_event_spaces_data", args=[self.event.pk]
+        )
+        context["sections_api_url"] = reverse(
+            "autenticacion:admin_event_sections_data", args=[self.event.pk]
+        )
+        catalog = self.event.catalogo_giros
+        context["rule_form"] = SpaceRuleForm(catalog=catalog or None)
+        context["rule_catalog"] = ({
+            "giros": [{"id": giro["id"], "name": giro["nombre"]} for giro in catalog],
+            "subgiros": {giro["id"]: [{"id": item["id"], "name": item["nombre"]} for item in giro["subgiros"]] for giro in catalog},
+        } if catalog else {
             "giros": [{"id": value, "name": label} for value, label in GIROS],
-            "subgiros": {
-                giro: [{"id": value, "name": label} for value, label in choices]
-                for giro, choices in SUBGIROS_POR_GIRO.items()
-            },
-        }
-        context["view_box"] = f"{min_x:g} {min_y:g} {width:g} {height:g}"
-        context["view_box_data"] = {
-            "x": min_x,
-            "y": min_y,
-            "width": width,
-            "height": height,
-        }
+            "subgiros": {giro: [{"id": value, "name": label} for value, label in choices] for giro, choices in SUBGIROS_POR_GIRO.items()},
+        })
         return context
 
     def post(self, request, *args, **kwargs):
         linked_ids = {item["id"] for item in self.event.boletab_eventos}
-        form = SpaceRuleForm(request.POST)
+        form = SpaceRuleForm(request.POST, catalog=self.event.catalogo_giros or None)
         if not form.is_valid():
             messages.error(request, "Revisa la configuración del espacio.")
             return self.get(request, *args, **kwargs)
@@ -322,6 +316,90 @@ class EventSpacesView(UserPassesTestMixin, TemplateView):
         return redirect(
             f"{request.path}?{urlencode({'evento': data['boletab_evento_id']})}"
         )
+
+
+class EventSpacesDataView(UserPassesTestMixin, View):
+    login_url = "autenticacion:admin_login"
+
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.is_staff
+
+    def get(self, request, pk):
+        event = get_object_or_404(Evento, pk=pk)
+        linked_ids = {item["id"] for item in event.boletab_eventos}
+        boletab_event_id = request.GET.get("evento", "")
+        if boletab_event_id not in linked_ids:
+            return JsonResponse(
+                {"error": "El evento de Boletab no está vinculado."}, status=400
+            )
+
+        try:
+            places = get_boletab_places(
+                boletab_event_id, request.GET.get("seccion") or None
+            )
+        except BoletabError as exc:
+            return JsonResponse({"error": str(exc)}, status=502)
+
+        rules = {
+            rule.asiento_id: rule
+            for rule in ReglaEspacio.objects.filter(
+                evento=event, boletab_evento_id=boletab_event_id
+            )
+        }
+        configured_count = 0
+        for place in places:
+            rule = rules.get(str(place.get("asientoId")))
+            place["rules"] = {
+                "reglas": rule.reglas if rule else [],
+                "giros": rule.giros if rule else [],
+                "subgiros": rule.subgiros if rule else [],
+                "folios": rule.folios if rule else [],
+            }
+            if rule:
+                configured_count += 1
+
+        coordinates = [point for place in places for point in place["coordinates"]]
+        if coordinates:
+            xs = [point[0] for point in coordinates]
+            ys = [point[1] for point in coordinates]
+            padding = 30
+            view_box = {
+                "x": min(xs) - padding,
+                "y": min(ys) - padding,
+                "width": max(max(xs) - min(xs) + 2 * padding, 100),
+                "height": max(max(ys) - min(ys) + 2 * padding, 100),
+            }
+        else:
+            view_box = {"x": 0, "y": 0, "width": 1000, "height": 700}
+
+        return JsonResponse(
+            {
+                "places": places,
+                "configured_count": configured_count,
+                "view_box": view_box,
+            }
+        )
+
+
+class EventSectionsDataView(UserPassesTestMixin, View):
+    login_url = "autenticacion:admin_login"
+
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.is_staff
+
+    def get(self, request, pk):
+        event = get_object_or_404(Evento, pk=pk)
+        boletab_event_id = request.GET.get("evento", "")
+        linked_ids = {item["id"] for item in event.boletab_eventos}
+        if boletab_event_id not in linked_ids:
+            return JsonResponse(
+                {"error": "El evento de Boletab no está vinculado."}, status=400
+            )
+        try:
+            sections = get_boletab_sections(boletab_event_id)
+        except BoletabError as exc:
+            return JsonResponse({"error": str(exc)}, status=502)
+        return JsonResponse({"sections": sections})
 
 
 class AdminLogoutView(LogoutView):

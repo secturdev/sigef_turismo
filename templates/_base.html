@@ -1,28 +1,75 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="es-mx">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="keywords" content="SIGEF, ferias, festivales, exposiciones" />
-    <meta name="description"
-          content="{% block meta_description %}SIGEF - Gestión de espacios para eventos{% endblock meta_description %}" />
-    <title>{% block title %}Inicio{% endblock title %} | SIGEF</title>
-    <link rel="stylesheet" href="{% static 'src/output.css' %}" />
-    {% block extra_css %}
-    {% endblock extra_css %}
-  </head>
-  <body>
-    {% block body %}
-      <main>
-        {% block content %}
-        {% endblock content %}
-      </main>
-    {% endblock body %}
-    <script defer src="{% static 'js/vendor/alpine.min.js' %}"></script>
-    <script type="module" src="{% static 'js/app.js' %}"></script>
-    <script src="{% static 'src/flowbite.min.js' %}"></script>
-    {% block extra_js %}
-    {% endblock extra_js %}
-  </body>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="keywords" content="SIGEF, ferias, festivales, exposiciones" />
+  <meta name="description"
+    content="{% block meta_description %}SIGEF - Gestión de espacios para eventos{% endblock meta_description %}" />
+  <title>{% block title %}Inicio{% endblock title %} | SIGEF</title>
+  <link rel="stylesheet" href="{% static 'src/output.css' %}" />
+  <style>[x-cloak] { display: none !important; }</style>
+  {% block extra_css %}
+  {% endblock extra_css %}
+</head>
+
+<body>
+  {% block body %}
+  <main>
+    {% block content %}
+    {% endblock content %}
+  </main>
+  {% endblock body %}
+  <script>
+    document.addEventListener("alpine:init", () => {
+      Alpine.store("loading", {
+        count: 0,
+        get active() {
+          return this.count > 0;
+        },
+        start() {
+          this.count += 1;
+        },
+        stop() {
+          this.count = Math.max(0, this.count - 1);
+        },
+        reset() {
+          this.count = 0;
+        },
+      });
+    });
+  </script>
+  <script defer src="{% static 'js/vendor/alpine.min.js' %}"></script>
+  <script type="module" src="{% static 'js/app.js' %}"></script>
+  <script src="{% static 'src/flowbite.min.js' %}"></script>
+
+  <!-- Spinner global -->
+  <div x-data x-show="$store.loading.active" x-transition.opacity x-cloak role="status" aria-live="polite"
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="flex flex-col items-center gap-3 rounded-xl bg-white p-6 shadow-xl">
+
+      <svg class="h-10 w-10 animate-spin text-[#911B7A]" xmlns="http://www.w3.org/2000/svg" fill="none"
+        viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      </svg>
+
+      <span class="text-sm font-medium text-gray-700">
+        Cargando...
+      </span>
+
+    </div>
+  </div>
+
+  {% block extra_js %}
+  {% endblock extra_js %}
+
+
+
+
+</body>
+
 </html>

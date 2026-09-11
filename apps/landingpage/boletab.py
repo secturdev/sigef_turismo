@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from django.conf import settings
@@ -83,27 +84,58 @@ def get_boletab_events() -> list[dict[str, str]]:
         event_id = item.get("id") or item.get("eventoId") or item.get("evento_id")
         name = item.get("nombre") or item.get("name") or item.get("titulo")
         if event_id is not None and name:
-            events.append({"id": str(event_id), "name": str(name)})
+            events.append({"id": str(event_id), "name": str(name), "estado": item.get("estado")})
     return events
 
 
-def get_boletab_places(event_id: str) -> list[dict]:
+def get_boletab_sections(event_id: str) -> list[dict]:
     if not settings.BOLETAB_BASE_URL or not settings.BOLETAB_API_KEY:
         raise BoletabError("La integración con Boletab no está configurada.")
     if not str(event_id).isdigit():
         raise BoletabError("El identificador del evento de Boletab no es válido.")
 
+    request = Request(
+        f"{settings.BOLETAB_BASE_URL}/eventos/{event_id}/secciones",
+        headers={"X-API-KEY": settings.BOLETAB_API_KEY, "Accept": "application/json"},
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=settings.BOLETAB_TIMEOUT) as response:
+            payload = json.load(response)
+    except HTTPError as exc:
+        raise BoletabError(
+            f"Boletab respondió con el error HTTP {exc.code} al consultar las secciones."
+        ) from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise BoletabError("No fue posible consultar las secciones de Boletab.") from exc
+
+    sections = _event_list(payload)
+    return [section for section in sections if isinstance(section, dict) and section.get("id") is not None]
+
+
+def get_boletab_places(event_id: str, section_id: str | None = None) -> list[dict]:
+    if not settings.BOLETAB_BASE_URL or not settings.BOLETAB_API_KEY:
+        raise BoletabError("La integración con Boletab no está configurada.")
+    if not str(event_id).isdigit():
+        raise BoletabError("El identificador del evento de Boletab no es válido.")
+    if section_id is not None and not str(section_id).isdigit():
+        raise BoletabError("El identificador de la sección de Boletab no es válido.")
+
     base_url = f"{settings.BOLETAB_BASE_URL}/eventos/{event_id}/lugares"
     headers = {"X-API-KEY": settings.BOLETAB_API_KEY, "Accept": "application/json"}
     try:
-        request = Request(f"{base_url}?page=0&size=1000", headers=headers, method="GET")
+        query = {"page": 0, "size": 1000}
+        if section_id is not None:
+            query["seccionId"] = section_id
+        request = Request(f"{base_url}?{urlencode(query)}", headers=headers, method="GET")
         with urlopen(request, timeout=settings.BOLETAB_TIMEOUT) as response:
             payload = json.load(response)
         places = _event_list(payload)
         total_pages = int(payload.get("totalPages", 1)) if isinstance(payload, dict) else 1
         for page in range(1, total_pages):
+            query["page"] = page
             request = Request(
-                f"{base_url}?page={page}&size=1000", headers=headers, method="GET"
+                f"{base_url}?{urlencode(query)}", headers=headers, method="GET"
             )
             with urlopen(request, timeout=settings.BOLETAB_TIMEOUT) as response:
                 places.extend(_event_list(json.load(response)))
