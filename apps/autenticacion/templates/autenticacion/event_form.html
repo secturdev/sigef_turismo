@@ -1,20 +1,61 @@
 {% extends "layouts/admin.html" %}
 
 {% block title %}{{ form_title }}{% endblock %}
+{% block content_class %}app-content--event-config{% endblock %}
 
 {% block content %}
+<!-- PASAMOS AL COMPONENTE EL TITLE Y SUBTITLE -->
 {% include "components/_page_header.html" with title=form_title subtitle=form_subtitle %}
 
-<section class="ui-panel admin-create-panel">
-  <form method="post" enctype="multipart/form-data" class="form-stack" novalidate>
+<section class="admin-create-panel">
+  <form method="post" enctype="multipart/form-data" class="event-config-flex" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}
-    <div class="ui-alert ui-alert--error" role="alert">{{ form.non_field_errors.0 }}</div>
+    <div class="ui-alert ui-alert--error event-config-flex__full" role="alert">{{ form.non_field_errors.0 }}</div>
     {% endif %}
-    {% include "components/_form_field.html" with field=form.boletab_eventos %}
-    <p id="boletab-events-status" class="form-help" role="status" aria-live="polite"></p>
+    <section class="event-config-card">
+      <header class="event-config-card__header">
+        <span>01</span>
+        <div><h2>Datos básicos</h2><p>Define la identidad, imagen y publicación del evento.</p></div>
+      </header>
+      {% include "components/_form_field.html" with field=form.nombre %}
+      {% include "components/_form_field.html" with field=form.descripcion %}
+      {% include "components/_form_field.html" with field=form.imagen %}
+      <div class="form-field {% if form.visible.errors %}has-error{% endif %}">
+        <label class="form-check-label" for="{{ form.visible.id_for_label }}">
+          {{ form.visible }}
+          <span>{{ form.visible.label }}</span>
+        </label>
+        {% if form.visible.help_text %}<p class="form-help">{{ form.visible.help_text }}</p>{% endif %}
+        {% for error in form.visible.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+      </div>
+    </section>
+    <section class="event-config-card">
+      <header class="event-config-card__header">
+        <span>02</span>
+        <div><h2>Integración con Boletab</h2><p>Relaciona los eventos que proporcionarán secciones y espacios.</p></div>
+      </header>
+      {% include "components/_form_field.html" with field=form.boletab_eventos %}
+      <p id="boletab-events-status" class="form-help" role="status" aria-live="polite"></p>
+    </section>
     {{ form.catalogo_giros }}
-    <div class="form-field {% if form.catalogo_giros.errors %}has-error{% endif %}">
+    <section class="event-config-card {% if form.catalogo_giros.errors %}has-error{% endif %}">
+      <header class="event-config-card__header">
+        <span>03</span>
+        <div><h2>Catálogo comercial</h2><p>Define la clasificación disponible para los expositores.</p></div>
+      </header>
+      <div class="catalog-import" x-data="giroCatalogImporter()">
+        <div>
+          <span class="form-label">Importar catálogo JSON</span>
+          <p class="form-help">Carga un archivo con giros, subgiros y sus descripciones. Después podrás editarlo antes de guardar.</p>
+        </div>
+        <label class="btn-outline catalog-import__button">
+          Seleccionar JSON
+          <input type="file" accept="application/json,.json" class="sr-only" @change="loadFile($event)" />
+        </label>
+        <p class="form-help" x-show="message" x-text="message" role="status"></p>
+        <p class="form-error" x-show="error" x-text="error" role="alert"></p>
+      </div>
       <div class="catalog-heading">
         <div>
           <span class="form-label">Giros y subgiros</span>
@@ -24,19 +65,80 @@
       </div>
       <div id="giros-editor" class="catalog-list"></div>
       {% for error in form.catalogo_giros.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-    </div>
-    {% include "components/_form_field.html" with field=form.nombre %}
-    {% include "components/_form_field.html" with field=form.descripcion %}
-    {% include "components/_form_field.html" with field=form.imagen %}
-    <div class="form-field {% if form.visible.errors %}has-error{% endif %}">
-      <label class="form-check-label" for="{{ form.visible.id_for_label }}">
-        {{ form.visible }}
-        <span>{{ form.visible.label }}</span>
-      </label>
-      {% if form.visible.help_text %}<p class="form-help">{{ form.visible.help_text }}</p>{% endif %}
-      {% for error in form.visible.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-    </div>
-    <div class="form-actions form-actions--split">
+    </section>
+    <section class="event-config-card {% if form.catalogo_folios.errors %}has-error{% endif %}"
+      x-data="eventFolioCatalog()" x-init="init($refs.catalogInput)"
+      x-effect="$refs.catalogInput.value = JSON.stringify(folios)">
+      {{ form.catalogo_folios }}
+      <header class="event-config-card__header">
+        <span>04</span>
+        <div><h2>Accesos por folio</h2><p>Genera o carga los códigos especiales permitidos en el evento.</p></div>
+      </header>
+      <div class="catalog-heading">
+        <div>
+          <span class="form-label">Folios autorizados</span>
+          <p class="form-help">Registra los folios que podrán utilizarse únicamente en este evento.</p>
+        </div>
+        <button type="button" class="btn-outline" @click="addFolio()">Agregar folio</button>
+      </div>
+      <div class="catalog-card">
+        <h3>Cargar o generar folios</h3>
+        <div class="catalog-grid">
+          <label class="catalog-field">
+            <span class="form-label">Cargar códigos</span>
+            <textarea class="form-input" rows="3" x-model="bulkCodes"
+              placeholder="Pega un folio por línea"></textarea>
+          </label>
+          <label class="catalog-field">
+            <span class="form-label">Tipo para los códigos</span>
+            <select class="form-input" x-model="bulkType">
+              <option value="PROGRAMA_SOCIAL">Programa social</option>
+              <option value="PATROCINADOR">Patrocinador</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="btn-outline" @click="loadCodes()" :disabled="!bulkCodes.trim()">Cargar lista</button>
+        <div class="catalog-grid">
+          <label class="catalog-field">
+            <span class="form-label">Prefijo para generar</span>
+            <input class="form-input" x-model.trim="prefix" placeholder="Ej. SOCIAL-2026" maxlength="40" />
+          </label>
+          <label class="catalog-field">
+            <span class="form-label">Cantidad</span>
+            <input class="form-input" type="number" x-model.number="quantity" min="1" max="500" />
+          </label>
+        </div>
+        <button type="button" class="btn-outline" @click="generateCodes()">Generar folios</button>
+        <p class="form-help" x-show="feedback" x-text="feedback" role="status"></p>
+      </div>
+      <div class="catalog-list">
+        <template x-for="(folio, index) in folios" :key="index">
+          <article class="catalog-card">
+            <div class="catalog-card__head">
+              <h3 x-text="`Folio ${index + 1}`"></h3>
+              <button type="button" class="catalog-remove" @click="removeFolio(index)">Eliminar folio</button>
+            </div>
+            <div class="catalog-grid">
+              <label class="catalog-field">
+                <span class="form-label">Código</span>
+                <input class="form-input" type="text" x-model.trim="folio.codigo"
+                  placeholder="Ej. SOCIAL-2026-001" maxlength="64" required />
+              </label>
+              <label class="catalog-field">
+                <span class="form-label">Tipo</span>
+                <select class="form-input" x-model="folio.tipo" required>
+                  <option value="PROGRAMA_SOCIAL">Programa social</option>
+                  <option value="PATROCINADOR">Patrocinador</option>
+                </select>
+              </label>
+            </div>
+          </article>
+        </template>
+        <p class="form-help" x-show="!folios.length">Este evento todavía no tiene folios autorizados.</p>
+      </div>
+      {% for error in form.catalogo_folios.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+    </section>
+    <div class="form-actions form-actions--split event-config-flex__full event-config-actions">
       <a href="{% url 'autenticacion:admin_events' %}" class="btn-outline btn-lg">Cancelar</a>
       <button type="submit" class="btn-primary btn-lg">{{ submit_label }}</button>
     </div>
@@ -47,11 +149,98 @@
 {% block extra_js %}
 {{ selected_boletab_event_ids|json_script:"selected-boletab-events" }}
 <script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('giroCatalogImporter', () => ({
+      message: '',
+      error: '',
+      async loadFile(event) {
+        this.message = '';
+        this.error = '';
+        const [file] = event.target.files;
+        if (!file) return;
+        try {
+          const catalog = JSON.parse(await file.text());
+          if (!Array.isArray(catalog) || !catalog.length) {
+            throw new Error('El JSON debe contener una lista de giros.');
+          }
+          window.dispatchEvent(new CustomEvent('giro-catalog:import', { detail: catalog }));
+          this.message = `${catalog.length} giro${catalog.length === 1 ? '' : 's'} cargado${catalog.length === 1 ? '' : 's'} correctamente.`;
+        } catch (error) {
+          this.error = error instanceof SyntaxError
+            ? 'El archivo no contiene un JSON válido.'
+            : error.message;
+        } finally {
+          event.target.value = '';
+        }
+      }
+    }));
+
+    Alpine.data('eventFolioCatalog', () => ({
+      folios: [],
+      bulkCodes: '',
+      bulkType: 'PROGRAMA_SOCIAL',
+      prefix: 'FOLIO',
+      quantity: 1,
+      feedback: '',
+      init(input) {
+        try {
+          const value = JSON.parse(input.value || '[]');
+          this.folios = Array.isArray(value) ? value : [];
+        } catch (_) {
+          this.folios = [];
+        }
+      },
+      addFolio() {
+        this.folios.push({ codigo: '', tipo: 'PROGRAMA_SOCIAL' });
+      },
+      removeFolio(index) {
+        this.folios.splice(index, 1);
+      },
+      appendCodes(codes) {
+        const existing = new Set(this.folios.map(folio => folio.codigo.toUpperCase()));
+        let added = 0;
+        codes.forEach(rawCode => {
+          const codigo = rawCode.trim().toUpperCase();
+          if (codigo && !existing.has(codigo)) {
+            this.folios.push({ codigo, tipo: this.bulkType });
+            existing.add(codigo);
+            added += 1;
+          }
+        });
+        this.feedback = `${added} folio${added === 1 ? '' : 's'} agregado${added === 1 ? '' : 's'}.`;
+      },
+      loadCodes() {
+        this.appendCodes(this.bulkCodes.split(/[\n,]/));
+        this.bulkCodes = '';
+      },
+      generateCodes() {
+        const quantity = Math.min(500, Math.max(1, Number(this.quantity) || 1));
+        const prefix = (this.prefix || 'FOLIO').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '-');
+        const codes = Array.from({ length: quantity }, () => {
+          const bytes = crypto.getRandomValues(new Uint8Array(6));
+          const suffix = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+          return `${prefix}-${suffix}`;
+        });
+        this.appendCodes(codes);
+      }
+    }));
+  });
+
   const statusAvailableEvents = 'PUBLICADO';
   const isEventEdit = {{ is_event_edit|yesno:"true,false" }};
 
   const catalogInput = document.getElementById('id_catalogo_giros');
   const catalogEditor = document.getElementById('giros-editor');
+  async function readJsonResponse(response) {
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      if (response.redirected || response.status === 401 || response.status === 403) {
+        throw new Error('Tu sesión expiró. Recarga la página o inicia sesión nuevamente.');
+      }
+      throw new Error(`El servidor devolvió una respuesta no válida (HTTP ${response.status}).`);
+    }
+    return response.json();
+  }
   let giros = [];
   try { giros = JSON.parse(catalogInput.value || '[]'); } catch (_) { giros = []; }
   if (!Array.isArray(giros) || !giros.length) giros = [{ nombre: '', descripcion: '', subgiros: [{ nombre: '', descripcion: '' }] }];
@@ -106,6 +295,10 @@
   document.getElementById('add-giro').addEventListener('click', () => {
     giros.push({ nombre: '', descripcion: '', subgiros: [{ nombre: '', descripcion: '' }] }); renderCatalog();
   });
+  window.addEventListener('giro-catalog:import', event => {
+    giros = event.detail;
+    renderCatalog();
+  });
   renderCatalog();
 
   document.addEventListener('DOMContentLoaded', async () => {
@@ -129,7 +322,7 @@
         headers: { 'Accept': 'application/json' },
         credentials: 'same-origin'
       });
-      const data = await response.json();
+      const data = await readJsonResponse(response);
       if (!response.ok) {
         throw new Error(data.error || 'No fue posible consultar los eventos de Boletab.');
       }

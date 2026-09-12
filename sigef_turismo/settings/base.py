@@ -164,6 +164,7 @@ OIDC_CANONICAL_ORIGIN = env("OIDC_CANONICAL_ORIGIN", default="").rstrip("/")
 # Catálogo externo de eventos de Boletab.
 BOLETAB_BASE_URL = env("BOLETAB_BASE_URL", default="").rstrip("/")
 BOLETAB_API_KEY = env("BOLETAB_API_KEY", default="")
+SIGEF_SPACES_API_KEY = env("SIGEF_SPACES_API_KEY", default="")
 BOLETAB_TIMEOUT = env.int("BOLETAB_TIMEOUT", default=15)
 
 PASSWORD_HASHERS = [

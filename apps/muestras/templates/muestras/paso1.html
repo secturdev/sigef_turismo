@@ -26,69 +26,81 @@
         <div class="doc-card__head">
           <div>
             <span class="application-section__number">1</span>
-            <h2 class="panel-section__title">Datos del expediente global</h2>
-            <p class="panel-section__lead">Verifica la información y documentos que se anexarán automáticamente.</p>
+            <h2 class="panel-section__title">Información tomada de tu perfil</h2>
+            <p class="panel-section__lead">Estos datos se anexarán automáticamente a tu solicitud.</p>
           </div>
         </div>
-        <dl class="summary-list">
-          <div>
-            <dt>Tipo de persona</dt>
-            <dd>{{ datos_globales.tipo_persona }}</dd>
-          </div>
-          {% for label, value in datos_globales.campos %}
-          <div>
-            <dt>{{ label }}</dt>
-            <dd>{{ value }}</dd>
-          </div>
-          {% endfor %}
-        </dl>
-        <div class="application-documents">
-          <div class="application-documents__header">
-            <div>
-              <span class="application-documents__eyebrow">Información vinculada</span>
-              <h3>Documentos del expediente</h3>
-              <p>Estos archivos se tomarán automáticamente. Para modificarlos debes hacerlo desde Mi perfil.</p>
+
+        <div class="application-source-grid">
+          <article class="application-source-card">
+            <header class="application-source-card__header">
+              <div class="application-source-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M20 21a8 8 0 0 0-16 0m12-13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" /></svg>
+              </div>
+              <div>
+                <span>Perfil</span>
+                <h3>Datos generales</h3>
+                <p>Información de identidad y contacto registrada en tu expediente.</p>
+              </div>
+            </header>
+            <dl class="summary-list application-source-card__summary">
+              <div>
+                <dt>Tipo de persona</dt>
+                <dd>{{ datos_globales.tipo_persona }}</dd>
+              </div>
+              {% for label, value in datos_globales.campos %}
+              <div>
+                <dt>{{ label }}</dt>
+                <dd>{{ value }}</dd>
+              </div>
+              {% endfor %}
+            </dl>
+            <a class="application-source-card__link" href="{% url 'expediente:profile' %}">Actualizar perfil</a>
+          </article>
+
+          <article class="application-source-card">
+            <header class="application-source-card__header">
+              <div class="application-source-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8m-6-6 6 6m-6-6v6h6" /></svg>
+              </div>
+              <div>
+                <span>Expediente</span>
+                <h3>Documentación</h3>
+                <p>Archivos vigentes que acompañarán automáticamente tu solicitud.</p>
+              </div>
+            </header>
+            <div class="application-documents__progress application-source-card__progress">
+              <div>
+                <strong>{{ datos_globales.documentos_cargados }} de {{ datos_globales.documentos_total }}</strong>
+                <span>documentos disponibles</span>
+              </div>
+              <progress value="{{ datos_globales.documentos_cargados }}" max="{{ datos_globales.documentos_total|default:1 }}">{{ datos_globales.documentos_porcentaje }}%</progress>
+              {% if datos_globales.documentos_obligatorios_pendientes %}
+                <span class="application-documents__pending">{{ datos_globales.documentos_obligatorios_pendientes }} obligatorio{{ datos_globales.documentos_obligatorios_pendientes|pluralize }} pendiente{{ datos_globales.documentos_obligatorios_pendientes|pluralize }}</span>
+              {% else %}
+                <span class="application-documents__complete">Documentación obligatoria completa</span>
+              {% endif %}
             </div>
-            <a class="btn-outline application-documents__manage" href="{% url 'expediente:profile' %}?tab=documents">Administrar documentos</a>
-          </div>
-          <div class="application-documents__progress">
-            <div>
-              <strong>{{ datos_globales.documentos_cargados }} de {{ datos_globales.documentos_total }}</strong>
-              <span>documentos disponibles</span>
-            </div>
-            <progress value="{{ datos_globales.documentos_cargados }}" max="{{ datos_globales.documentos_total|default:1 }}">{{ datos_globales.documentos_porcentaje }}%</progress>
-            {% if datos_globales.documentos_obligatorios_pendientes %}
-              <span class="application-documents__pending">{{ datos_globales.documentos_obligatorios_pendientes }} obligatorio{{ datos_globales.documentos_obligatorios_pendientes|pluralize }} pendiente{{ datos_globales.documentos_obligatorios_pendientes|pluralize }}</span>
-            {% else %}
-              <span class="application-documents__complete">Documentación obligatoria completa</span>
-            {% endif %}
-          </div>
-          <div class="application-documents__list">
-            {% for document in datos_globales.documentos %}
-              <article class="application-document is-{{ document.estado|lower }}">
-                <div class="application-document__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8m-6-6 6 6m-6-6v6h6" /></svg>
-                </div>
-                <div class="application-document__body">
-                  <div class="application-document__title">
-                    <strong>{{ document.tipo.nombre }}</strong>
-                    <span class="document-kind">{% if document.tipo.obligatorio %}Obligatorio{% else %}Opcional{% endif %}</span>
+            <div class="application-documents__list application-source-card__documents">
+              {% for document in datos_globales.documentos %}
+                <article class="application-document is-{{ document.estado|lower }}">
+                  <div class="application-document__body">
+                    <div class="application-document__title">
+                      <strong>{{ document.tipo.nombre }}</strong>
+                      <span class="document-kind">{% if document.tipo.obligatorio %}Obligatorio{% else %}Opcional{% endif %}</span>
+                    </div>
+                    {% if document.version %}
+                      <span class="application-document__filename" title="{{ document.version.nombre_original }}">{{ document.version.nombre_original }}</span>
+                    {% else %}
+                      <span class="application-document__filename">Sin archivo</span>
+                    {% endif %}
                   </div>
-                  {% if document.version %}
-                    <span class="application-document__filename" title="{{ document.version.nombre_original }}">{{ document.version.nombre_original }}</span>
-                    <small>Cargado el {{ document.version.fecha_carga|date:"d/m/Y" }}{% if document.version.fecha_vencimiento %} · Vence {{ document.version.fecha_vencimiento|date:"d/m/Y" }}{% endif %}</small>
-                  {% else %}
-                    <span class="application-document__filename">Aún no se ha cargado un archivo</span>
-                    <small>Completa este documento en tu expediente global.</small>
-                  {% endif %}
-                </div>
-                <div class="application-document__actions">
-                  <span class="document-status">{{ document.estado_label }}</span>
-                  {% if document.version %}<a href="{% url 'expediente:download_version' document.version.pk %}">Abrir PDF</a>{% else %}<a href="{% url 'expediente:profile' %}?tab=documents">Subir archivo</a>{% endif %}
-                </div>
-              </article>
-            {% empty %}<p>No hay documentos configurados para este tipo de persona.</p>{% endfor %}
-          </div>
+                  <div class="application-document__actions"><span class="document-status">{{ document.estado_label }}</span></div>
+                </article>
+              {% empty %}<p class="form-help">No hay documentos configurados para este tipo de persona.</p>{% endfor %}
+            </div>
+            <a class="application-source-card__link" href="{% url 'expediente:profile' %}?tab=documents">Administrar documentos</a>
+          </article>
         </div>
       </section>
     {% endif %}

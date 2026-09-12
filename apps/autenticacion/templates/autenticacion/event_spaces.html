@@ -28,7 +28,7 @@
       </div>
       <div>
         <label class="form-label" for="boletab-section">Sección</label>
-        <select id="boletab-section" class="form-input" x-model="sectionId" @change="loadPlaces()"
+        <select id="boletab-section" class="form-input" x-model="sectionId" @change="selectSection()"
           :disabled="!sections.length">
           <template x-for="section in sections" :key="section.id">
             <option :value="String(section.id)" x-text="`${section.nombre} (${section.totalLugares || 0})`"></option>
@@ -36,10 +36,62 @@
         </select>
       </div>
     </div>
-    <div class="space-toolbar__summary">
+    <!-- <div class="space-toolbar__summary">
       Total: <strong x-text="placeList.length"></strong> espacios ·
       <strong x-text="configuredCount"></strong> configurados
+    </div> -->
+  </div>
+
+  <div class="section-capacity">
+    <div class="space-rule-group__heading">
+      <div>
+        <h3>Capacidad por giro y subgiro de la sección</h3>
+        <p class="form-help">Aplica a los stands sin configuración individual dentro de esta sección.</p>
+      </div>
+      <button type="button" class="btn-outline" @click="addSectionRule()" :disabled="!sectionId">Agregar
+        capacidad</button>
     </div>
+    <div class="space-rule-summary section-capacity__summary">
+      <div><span>Total de la sección</span><strong x-text="sectionCapacity.total_spaces"></strong></div>
+      <div><span>Con regla individual</span><strong x-text="sectionCapacity.individual_spaces"></strong></div>
+      <div><span>Límite global</span><strong x-text="sectionCapacity.global_limit"></strong></div>
+      <div><span>Asignados / disponibles</span><strong
+          x-text="`${sectionCapacity.allocated} / ${sectionCapacity.remaining}`"></strong></div>
+    </div>
+    <form @submit.prevent="saveSectionRules($event)" class="space-rule-form">
+      {% csrf_token %}
+      <input type="hidden" name="boletab_evento_id" :value="eventId" />
+      <input type="hidden" name="seccion_id" :value="sectionId" />
+      <input type="hidden" name="reglas_json" :value="JSON.stringify(sectionRules)" />
+      <div class="space-rule-builder">
+        <template x-for="(rule, index) in sectionRules" :key="index">
+          <div class="space-rule-row section-capacity__row">
+            <select class="form-input" x-model="rule.giro" @change="rule.subgiro = ''" required>
+              <option value="">Selecciona un giro</option>
+              <template x-for="giro in catalog.giros" :key="giro.id">
+                <option :value="giro.id" x-text="giro.name"></option>
+              </template>
+            </select>
+            <select class="form-input" x-model="rule.subgiro" :disabled="!rule.giro" required>
+              <option value="">Selecciona un subgiro</option>
+              <template x-for="subgiro in subgirosFor(rule.giro)" :key="subgiro.id">
+                <option :value="subgiro.id" x-text="subgiro.name"></option>
+              </template>
+            </select>
+            <input class="form-input" type="number" x-model.number="rule.cantidad" min="1" placeholder="Cantidad"
+              required />
+            <button type="button" class="space-rule-row__remove" @click="removeSectionRule(index)"
+              aria-label="Eliminar capacidad">&times;</button>
+          </div>
+        </template>
+        <p class="space-rule-builder__empty" x-show="!sectionRules.length">Esta sección no tiene capacidades
+          configuradas.</p>
+      </div>
+      <p class="form-help" x-show="sectionSaveMessage" x-text="sectionSaveMessage" role="status"></p>
+      <p class="form-error" x-show="sectionSaveError" x-text="sectionSaveError" role="alert"></p>
+      <button type="submit" class="btn-primary" :disabled="sectionSaving || !sectionRules.length"
+        x-text="sectionSaving ? 'Guardando…' : 'Guardar capacidad de sección'"></button>
+    </form>
   </div>
 
   <div class="space-map-layout">
@@ -54,15 +106,15 @@
           </svg>
         </button>
       </div>
-      <p class="space-map-hint">Rueda para zoom · Arrastra para moverte</p>
+      <p class="space-map-hint">Haz clic para seleccionar varios espacios · Rueda para zoom · Arrastra para moverte</p>
       <svg class="space-map" x-show="placeList.length" :class="{ 'is-panning': panning }"
         x-effect="$el.setAttribute('viewBox', currentViewBox)" preserveAspectRatio="xMidYMid meet"
         aria-label="Mapa de espacios" @wheel.prevent="wheelZoom($event)" @pointerdown="startPan($event)"
         @pointermove.window="movePan($event)" @pointerup.window="endPan()" @pointercancel.window="endPan()"
-        @click="selectPlaceFromEvent($event)" @keydown.enter="selectPlaceFromEvent($event)"
-        x-html="placesSvg">
+        @click="selectPlaceFromEvent($event)" @keydown.enter="selectPlaceFromEvent($event)" x-html="placesSvg">
       </svg>
-      <div class="space-map-empty" x-show="!loading && !error && !placeList.length">No se encontraron lugares para este evento.</div>
+      <div class="space-map-empty" x-show="!loading && !error && !placeList.length">No se encontraron lugares para este
+        evento.</div>
       <div class="space-map-empty" x-show="error" x-text="error"></div>
     </div>
 
@@ -75,8 +127,12 @@
       </template>
       <template x-if="selected">
         <div>
-          <span class="space-source-card__label">Espacio seleccionado</span>
-          <h2 class="space-detail__title" x-text="selected.etiqueta || 'Sin etiqueta'"></h2>
+          <span class="space-source-card__label"
+            x-text="`${selectedIds.length} espacio${selectedIds.length === 1 ? '' : 's'} seleccionado${selectedIds.length === 1 ? '' : 's'}`"></span>
+          <h2 class="space-detail__title"
+            x-text="selectedIds.length === 1 ? (selected.etiqueta || 'Sin etiqueta') : 'Configuración compartida'"></h2>
+          <p class="form-help" x-show="selectedIds.length > 1">Al guardar, esta configuración se aplicará a todos los
+            espacios seleccionados.</p>
           <dl class="space-detail__list">
             <div>
               <dt>Sección</dt>
@@ -114,31 +170,34 @@
           <div class="space-rule-summary">
             <div>
               <span>Giros</span>
-              <strong x-text="selected.rules.reglas.length || 'Todos'"></strong>
+              <strong x-text="selected.rules.reglas.length || 'No aplica'"></strong>
             </div>
             <div>
               <span>Subgiros</span>
-              <strong x-text="selected.rules.reglas.filter(rule => rule.subgiro).length || 'Todos'"></strong>
+              <strong x-text="selected.rules.reglas.filter(rule => rule.subgiro).length || 'No aplica'"></strong>
             </div>
             <div>
               <span>Folios</span>
-              <strong x-text="selected.rules.folios.length || 'Todos'"></strong>
+              <strong x-text="selected.rules.folios.length || 'No aplica'"></strong>
             </div>
           </div>
           <!-- REGLAS DE ELEGIBILIDAD PARA ESPACIOS -->
           <div class="space-inline-rules">
-            <div class="space-rule-group__heading">
+            <div class="space-rule-group__heading" x-show="!hasFolios">
               <h3>Reglas de elegibilidad</h3>
               <button type="button" class="btn-outline" @click="addRule()">Agregar regla</button>
             </div>
-            <p class="form-help">Cada regla relaciona un giro con uno de sus subgiros.</p>
-            <form method="post" class="space-rule-form">
+            <p class="form-help" x-show="!hasFolios">Cada regla relaciona un giro con uno de sus subgiros. Al agregarla,
+              la configuración por folio se deshabilita.</p>
+            <p class="form-help" x-show="hasFolios">Este espacio está configurado por folio. Elimina los folios
+              seleccionados para poder agregar reglas de giro y subgiro.</p>
+            <form method="post" class="space-rule-form" @submit.prevent="saveRules($event)">
               {% csrf_token %}
               <input type="hidden" name="boletab_evento_id" :value="eventId" />
-              <input type="hidden" name="asiento_id" :value="selected.asientoId" />
+              <input type="hidden" name="asiento_ids_json" :value="JSON.stringify(selectedIds)" />
               <input type="hidden" name="etiqueta" :value="selected.etiqueta" />
               <input type="hidden" name="reglas_json" :value="JSON.stringify(selected.rules.reglas)" />
-              <div class="space-rule-builder">
+              <div class="space-rule-builder" x-show="!hasFolios">
                 <template x-for="(rule, index) in selected.rules.reglas" :key="index">
                   <div class="space-rule-row">
                     <div class="form-field">
@@ -166,15 +225,36 @@
                       aria-label="Eliminar regla">&times;</button>
                   </div>
                 </template>
-                <p class="space-rule-builder__empty" x-show="selected.rules.reglas.length === 0">Sin reglas: cualquier
-                  giro y subgiro puede elegir este espacio.</p>
+                <p class="space-rule-builder__empty" x-show="selected.rules.reglas.length === 0">Agrega una regla o
+                  configura el acceso mediante folio.</p>
               </div>
-              <div class="form-field">
-                <label class="form-label" for="space-folios">Folios permitidos</label>
-                <textarea id="space-folios" name="folios" class="form-input" rows="3" x-model="selected.foliosText"
-                  placeholder="Un folio por línea"></textarea>
+              <input type="hidden" name="folios" :value="selected.rules.folios.join('\n')" />
+              <div class="form-field" x-show="!hasGiroRules">
+                <span class="form-label">Folios permitidos</span>
+                <p class="form-help">Al seleccionar un folio, las reglas de giro y subgiro se deshabilitan.</p>
+                <p class="form-help" x-show="catalog.folios.length">
+                  <template x-for="folio in catalog.folios" :key="folio.codigo">
+                    <label class="form-check-label">
+                      <input type="checkbox" class="form-checkbox" :value="folio.codigo"
+                        :checked="selected.rules.folios.includes(folio.codigo)"
+                        @change="toggleFolio(folio.codigo, $event.target.checked)" />
+                      <span
+                        x-text="`${folio.codigo} · ${folio.tipo === 'PATROCINADOR' ? 'Patrocinador' : 'Programa social'}`"></span>
+                    </label>
+                  </template>
+                </p>
+                <p class="form-help" x-show="!catalog.folios.length">
+                  Este evento no tiene folios configurados.
+                  <a href="{{ event_update_url }}">Configurar folios del evento</a>
+                </p>
               </div>
-              <button type="submit" class="btn-primary w-full">Guardar reglas</button>
+              <p class="form-help" x-show="saveMessage" x-text="saveMessage" role="status"></p>
+              <p class="form-error" x-show="saveError" x-text="saveError" role="alert"></p>
+              <button type="submit" class="btn-primary w-full" :disabled="saving"
+                x-text="saving ? 'Guardando…' : `Guardar en ${selectedIds.length} espacio${selectedIds.length === 1 ? '' : 's'}`"></button>
+              <button type="button" class="btn-outline w-full" x-show="selectedSpacesHaveIndividualRules"
+                :disabled="clearing" @click="clearSpaceRules()"
+                x-text="clearing ? 'Quitando…' : 'Quitar configuración individual'"></button>
             </form>
           </div>
         </div>
@@ -195,6 +275,11 @@
       linkedEvents,
       sections: [],
       sectionId: '',
+      sectionRules: [],
+      sectionCapacity: { total_spaces: 0, individual_spaces: 0, global_limit: 0, allocated: 0, remaining: 0 },
+      sectionSaving: false,
+      sectionSaveMessage: '',
+      sectionSaveError: '',
       catalog,
       places: {},
       placeList: [],
@@ -202,6 +287,11 @@
       loading: false,
       error: '',
       selected: null,
+      selectedIds: [],
+      saving: false,
+      clearing: false,
+      saveMessage: '',
+      saveError: '',
       baseViewBox: { ...emptyViewBox },
       viewBox: { ...emptyViewBox },
       panning: false,
@@ -209,6 +299,24 @@
       panStart: null,
       get currentViewBox() {
         return `${this.viewBox.x} ${this.viewBox.y} ${this.viewBox.width} ${this.viewBox.height}`;
+      },
+      get hasGiroRules() { return Boolean(this.selected?.rules.reglas.length); },
+      get hasFolios() { return Boolean(this.selected?.rules.folios.length); },
+      get selectedSpacesHaveIndividualRules() {
+        return this.selectedIds.some(id => this.places[id]?.rules.configured);
+      },
+      async readJsonResponse(response) {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          if (response.status === 403) {
+            throw new Error('La sesión o el token de seguridad expiró. Recarga la página e inténtalo nuevamente.');
+          }
+          if (response.redirected || response.status === 401) {
+            throw new Error('Tu sesión expiró. Inicia sesión nuevamente.');
+          }
+          throw new Error(`El servidor devolvió una respuesta no válida (HTTP ${response.status}).`);
+        }
+        return response.json();
       },
       get placesSvg() {
         const escape = value => String(value ?? '')
@@ -221,6 +329,7 @@
         return this.placeList.map(place => {
           const classes = [
             'space-place',
+            this.selectedIds.includes(String(place.asientoId)) ? 'is-selected' : '',
             !place.habilitado ? 'is-disabled' : '',
             place.estado !== 'DISPONIBLE' ? 'is-unavailable' : ''
           ].filter(Boolean).join(' ');
@@ -243,6 +352,7 @@
         this.placeList = [];
         this.places = {};
         this.selected = null;
+        this.selectedIds = [];
         try {
           const url = new URL(this.sectionsApiUrl, window.location.origin);
           url.searchParams.set('evento', this.eventId);
@@ -250,12 +360,13 @@
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin'
           });
-          const data = await response.json();
+          const data = await this.readJsonResponse(response);
           if (!response.ok) throw new Error(data.error || 'No fue posible consultar las secciones.');
 
           this.sections = data.sections || [];
           if (this.sections.length) {
             this.sectionId = String(this.sections[0].id);
+            this.loadSectionRules();
             await this.loadPlaces();
           }
         } catch (error) {
@@ -268,6 +379,7 @@
         this.loading = true;
         this.error = '';
         this.selected = null;
+        this.selectedIds = [];
         try {
           const url = new URL(this.apiUrl, window.location.origin);
           url.searchParams.set('evento', this.eventId);
@@ -276,7 +388,7 @@
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin'
           });
-          const data = await response.json();
+          const data = await this.readJsonResponse(response);
           if (!response.ok) throw new Error(data.error || 'No fue posible consultar los espacios.');
 
           this.placeList = data.places || [];
@@ -284,6 +396,7 @@
             this.placeList.map(place => [String(place.asientoId), place])
           );
           this.configuredCount = data.configured_count || 0;
+          this.sectionCapacity = data.section_capacity || { total_spaces: 0, individual_spaces: 0, global_limit: 0, allocated: 0, remaining: 0 };
           this.baseViewBox = { ...(data.view_box || emptyViewBox) };
           this.resetView();
 
@@ -294,9 +407,47 @@
           this.placeList = [];
           this.places = {};
           this.configuredCount = 0;
+          this.sectionCapacity = { total_spaces: 0, individual_spaces: 0, global_limit: 0, allocated: 0, remaining: 0 };
           this.error = error.message;
         } finally {
           this.loading = false;
+        }
+      },
+      selectSection() {
+        this.loadSectionRules();
+        this.loadPlaces();
+      },
+      loadSectionRules() {
+        const section = this.sections.find(item => String(item.id) === String(this.sectionId));
+        this.sectionRules = (section?.capacity_rules || []).map(rule => ({ ...rule }));
+        this.sectionSaveMessage = '';
+        this.sectionSaveError = '';
+      },
+      addSectionRule() {
+        this.sectionRules.push({ giro: '', subgiro: '', cantidad: 1 });
+      },
+      removeSectionRule(index) { this.sectionRules.splice(index, 1); },
+      async saveSectionRules(event) {
+        this.sectionSaving = true;
+        this.sectionSaveMessage = '';
+        this.sectionSaveError = '';
+        try {
+          const response = await fetch(this.sectionsApiUrl, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: new FormData(event.currentTarget)
+          });
+          const data = await this.readJsonResponse(response);
+          if (!response.ok) throw new Error(data.error || 'No fue posible guardar la capacidad.');
+          const section = this.sections.find(item => String(item.id) === String(this.sectionId));
+          if (section) section.capacity_rules = this.sectionRules.map(rule => ({ ...rule }));
+          this.sectionCapacity = data.capacity;
+          this.sectionSaveMessage = data.message;
+        } catch (error) {
+          this.sectionSaveError = error.message;
+        } finally {
+          this.sectionSaving = false;
         }
       },
       selectPlace(id) {
@@ -304,7 +455,28 @@
           this.panMoved = false;
           return;
         }
-        const place = this.places[String(id)];
+        const normalizedId = String(id);
+        const place = this.places[normalizedId];
+        const existingIndex = this.selectedIds.indexOf(normalizedId);
+        if (existingIndex >= 0) {
+          this.selectedIds.splice(existingIndex, 1);
+          if (!this.selectedIds.length) {
+            this.selected = null;
+          } else if (String(this.selected.asientoId) === normalizedId) {
+            const nextPlace = this.places[this.selectedIds[0]];
+            this.selected = {
+              ...nextPlace,
+              rules: this.selected.rules,
+              foliosText: this.selected.foliosText
+            };
+          }
+          return;
+        }
+        this.selectedIds.push(normalizedId);
+        if (this.selected) return;
+        this.setSelectedPlace(place);
+      },
+      setSelectedPlace(place) {
         this.selected = {
           ...place,
           rules: {
@@ -320,9 +492,112 @@
         const element = event.target.closest('[data-space-id]');
         if (element) this.selectPlace(element.dataset.spaceId);
       },
-      addRule() { this.selected.rules.reglas.push({ giro: '', subgiro: '' }); },
+      addRule() {
+        if (!this.hasFolios) this.selected.rules.reglas.push({ giro: '', subgiro: '' });
+      },
       removeRule(index) { this.selected.rules.reglas.splice(index, 1); },
+      toggleFolio(code, checked) {
+        if (this.hasGiroRules) return;
+        if (checked && !this.selected.rules.folios.includes(code)) {
+          this.selected.rules.folios.push(code);
+        } else if (!checked) {
+          this.selected.rules.folios = this.selected.rules.folios.filter(value => value !== code);
+        }
+        this.selected.foliosText = this.selected.rules.folios.join('\n');
+      },
       subgirosFor(giro) { return this.catalog.subgiros[giro] || []; },
+      async saveRules(event) {
+        this.saving = true;
+        this.saveMessage = '';
+        this.saveError = '';
+        try {
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: new FormData(event.currentTarget)
+          });
+          const data = await this.readJsonResponse(response);
+          if (!response.ok) throw new Error(data.error || 'No fue posible guardar la configuración.');
+
+          const rules = this.selected.rules.reglas.map(rule => ({ ...rule }));
+          const folios = [...this.selected.rules.folios];
+          this.selectedIds.forEach(spaceId => {
+            this.places[spaceId].rules = {
+              reglas: rules.map(rule => ({ ...rule })),
+              giros: [...new Set(rules.map(rule => rule.giro))],
+              subgiros: [...new Set(rules.map(rule => rule.subgiro).filter(Boolean))],
+              folios: [...new Set(folios)],
+              configured: true
+            };
+          });
+          this.configuredCount = this.placeList.filter(place =>
+            place.rules.configured
+          ).length;
+          this.recalculateSectionCapacity();
+          this.saveMessage = data.message;
+        } catch (error) {
+          this.saveError = error.message;
+        } finally {
+          this.saving = false;
+        }
+      },
+      async clearSpaceRules() {
+        const configuredIds = this.selectedIds.filter(id => this.places[id]?.rules.configured);
+        if (!configuredIds.length) return;
+        const confirmed = window.confirm(
+          `Se quitará la configuración individual de ${configuredIds.length} espacio${configuredIds.length === 1 ? '' : 's'}. ¿Deseas continuar?`
+        );
+        if (!confirmed) return;
+
+        this.clearing = true;
+        this.saveMessage = '';
+        this.saveError = '';
+        const formData = new FormData();
+        formData.set('csrfmiddlewaretoken', this.$root.querySelector('[name=csrfmiddlewaretoken]').value);
+        formData.set('action', 'clear_space_rules');
+        formData.set('boletab_evento_id', this.eventId);
+        formData.set('asiento_ids_json', JSON.stringify(configuredIds));
+        try {
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: formData
+          });
+          const data = await this.readJsonResponse(response);
+          if (!response.ok) throw new Error(data.error || 'No fue posible quitar la configuración.');
+          configuredIds.forEach(spaceId => {
+            this.places[spaceId].rules = {
+              reglas: [], giros: [], subgiros: [], folios: [], configured: false
+            };
+          });
+          if (configuredIds.includes(String(this.selected.asientoId))) {
+            this.selected.rules = {
+              reglas: [], giros: [], subgiros: [], folios: [], configured: false
+            };
+            this.selected.foliosText = '';
+          }
+          this.configuredCount = this.placeList.filter(place => place.rules.configured).length;
+          this.recalculateSectionCapacity();
+          this.saveMessage = `${data.message} Ahora heredará la configuración de su sección.`;
+        } catch (error) {
+          this.saveError = error.message;
+        } finally {
+          this.clearing = false;
+        }
+      },
+      recalculateSectionCapacity() {
+        const allocated = this.sectionRules.reduce((total, rule) => total + (Number(rule.cantidad) || 0), 0);
+        const globalLimit = Math.max(this.placeList.length - this.configuredCount, 0);
+        this.sectionCapacity = {
+          total_spaces: this.placeList.length,
+          individual_spaces: this.configuredCount,
+          global_limit: globalLimit,
+          allocated,
+          remaining: Math.max(globalLimit - allocated, 0)
+        };
+      },
       resetView() { this.viewBox = { ...this.baseViewBox }; },
       zoom(factor, anchorX = 0.5, anchorY = 0.5) {
         const minWidth = this.baseViewBox.width * 0.08;

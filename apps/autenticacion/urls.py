@@ -1,10 +1,16 @@
 from django.urls import path
 
 from . import views
+from apps.landingpage.api import AvailableSpacesApiView
 
 app_name = "autenticacion"
 
 urlpatterns = [
+    path(
+        "api/v1/eventos/<int:event_id>/usuarios/<int:user_id>/espacios-disponibles/",
+        AvailableSpacesApiView.as_view(),
+        name="api_available_spaces",
+    ),
     path("login/", views.UserLoginView.as_view(), name="login"),
     path("administracion/login/", views.AdminLoginView.as_view(), name="admin_login"),
     path(

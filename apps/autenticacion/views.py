@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import SuspiciousOperation
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -17,9 +19,9 @@ from mozilla_django_oidc.views import (
     OIDCLogoutView,
 )
 
-from .forms import AdminCreateForm, AdminLoginForm, EventCreateForm, SpaceRuleForm
+from .forms import AdminCreateForm, AdminLoginForm, EventCreateForm, SectionRuleForm, SpaceRuleForm
 from .models import Usuario
-from apps.landingpage.models import Evento, ReglaEspacio
+from apps.landingpage.models import Evento, ReglaEspacio, ReglaSeccion
 from apps.muestras.constants import GIROS, SUBGIROS, SUBGIROS_POR_GIRO
 from apps.landingpage.boletab import (
     BoletabError,
@@ -200,8 +202,10 @@ class EventUpdateView(UserPassesTestMixin, UpdateView):
         if self.request.method == "POST":
             try:
                 kwargs["boletab_events"] = get_boletab_events()
-            except BoletabError as exc:
-                messages.error(self.request, str(exc))
+            except BoletabError:
+                # La edición local usa como respaldo las relaciones ya
+                # persistidas cuando Boletab no está disponible.
+                pass
         return kwargs
 
     def form_valid(self, form):
@@ -260,8 +264,14 @@ class EventSpacesView(UserPassesTestMixin, TemplateView):
         context["sections_api_url"] = reverse(
             "autenticacion:admin_event_sections_data", args=[self.event.pk]
         )
+        context["event_update_url"] = reverse(
+            "autenticacion:admin_event_update", args=[self.event.pk]
+        )
         catalog = self.event.catalogo_giros
-        context["rule_form"] = SpaceRuleForm(catalog=catalog or None)
+        context["rule_form"] = SpaceRuleForm(
+            catalog=catalog or None, folio_catalog=self.event.catalogo_folios
+        )
+        context["folio_catalog"] = self.event.catalogo_folios
         context["rule_catalog"] = ({
             "giros": [{"id": giro["id"], "name": giro["nombre"]} for giro in catalog],
             "subgiros": {giro["id"]: [{"id": item["id"], "name": item["nombre"]} for item in giro["subgiros"]] for giro in catalog},
@@ -269,50 +279,149 @@ class EventSpacesView(UserPassesTestMixin, TemplateView):
             "giros": [{"id": value, "name": label} for value, label in GIROS],
             "subgiros": {giro: [{"id": value, "name": label} for value, label in choices] for giro, choices in SUBGIROS_POR_GIRO.items()},
         })
+        context["rule_catalog"]["folios"] = self.event.catalogo_folios
         return context
 
     def post(self, request, *args, **kwargs):
-        linked_ids = {item["id"] for item in self.event.boletab_eventos}
-        form = SpaceRuleForm(request.POST, catalog=self.event.catalogo_giros or None)
-        if not form.is_valid():
-            messages.error(request, "Revisa la configuración del espacio.")
+        wants_json = request.headers.get("Accept") == "application/json"
+
+        def error_response(message, status=400):
+            if wants_json:
+                return JsonResponse({"error": message}, status=status)
+            messages.error(request, message)
             return self.get(request, *args, **kwargs)
+
+        linked_ids = {item["id"] for item in self.event.boletab_eventos}
+        if request.POST.get("action") == "clear_space_rules":
+            boletab_event_id = request.POST.get("boletab_evento_id", "")
+            if boletab_event_id not in linked_ids:
+                return error_response("El evento de Boletab no está vinculado.")
+            try:
+                asiento_ids = json.loads(request.POST.get("asiento_ids_json", "[]"))
+            except (TypeError, json.JSONDecodeError):
+                return error_response("Los espacios seleccionados no son válidos.")
+            if not isinstance(asiento_ids, list):
+                return error_response("Los espacios seleccionados no son válidos.")
+            asiento_ids = list(dict.fromkeys(str(value).strip() for value in asiento_ids))
+            if not asiento_ids or any(not value for value in asiento_ids):
+                return error_response("Selecciona al menos un espacio.")
+
+            deleted_count, _ = ReglaEspacio.objects.filter(
+                evento=self.event,
+                boletab_evento_id=boletab_event_id,
+                asiento_id__in=asiento_ids,
+            ).delete()
+            message = (
+                f"Se quitó la configuración individual de {deleted_count} "
+                f"espacio{'s' if deleted_count != 1 else ''}."
+            )
+            if wants_json:
+                return JsonResponse({"message": message, "deleted_count": deleted_count})
+            messages.success(request, message)
+            return redirect(
+                f"{request.path}?{urlencode({'evento': boletab_event_id})}"
+            )
+
+        form = SpaceRuleForm(
+            request.POST,
+            catalog=self.event.catalogo_giros or None,
+            folio_catalog=self.event.catalogo_folios,
+        )
+        if not form.is_valid():
+            first_error = next(iter(form.errors.values()))[0]
+            return error_response(str(first_error))
 
         data = form.cleaned_data
         if data["boletab_evento_id"] not in linked_ids:
-            messages.error(request, "El evento de Boletab no está vinculado.")
-            return redirect("autenticacion:admin_events")
+            return error_response("El evento de Boletab no está vinculado.")
 
         try:
             places = get_boletab_places(data["boletab_evento_id"])
         except BoletabError as exc:
+            if wants_json:
+                return JsonResponse({"error": str(exc)}, status=502)
             messages.error(request, str(exc))
             return redirect(
                 f"{request.path}?{urlencode({'evento': data['boletab_evento_id']})}"
             )
         valid_places = {str(place.get("asientoId")): place for place in places}
-        if data["asiento_id"] not in valid_places:
-            messages.error(request, "El espacio seleccionado no pertenece al evento.")
-            return redirect("autenticacion:admin_events")
+        invalid_ids = [
+            value
+            for value in data["asiento_ids_json"]
+            if value not in valid_places
+        ]
+        if invalid_ids:
+            return error_response("Uno o más espacios no pertenecen al evento.")
 
-        place = valid_places[data["asiento_id"]]
-        ReglaEspacio.objects.update_or_create(
-            evento=self.event,
-            boletab_evento_id=data["boletab_evento_id"],
-            asiento_id=data["asiento_id"],
-            defaults={
-                "etiqueta": place.get("etiqueta") or data["etiqueta"],
-                "reglas": data["reglas_json"],
-                "giros": list(dict.fromkeys(r["giro"] for r in data["reglas_json"])),
-                "subgiros": list(
-                    dict.fromkeys(
-                        r["subgiro"] for r in data["reglas_json"] if r["subgiro"]
-                    )
-                ),
-                "folios": data["folios"],
-            },
+        existing_individual_ids = set(
+            ReglaEspacio.objects.filter(
+                evento=self.event,
+                boletab_evento_id=data["boletab_evento_id"],
+            ).values_list("asiento_id", flat=True)
         )
-        messages.success(request, f"Se guardaron las reglas de {place.get('etiqueta')}.")
+        places_by_section: dict[str, set[str]] = {}
+        for place_id, place in valid_places.items():
+            section_id = str(place.get("seccionId") or "")
+            places_by_section.setdefault(section_id, set()).add(place_id)
+        selected_ids = set(data["asiento_ids_json"])
+        selected_sections = {
+            str(valid_places[place_id].get("seccionId") or "")
+            for place_id in selected_ids
+        }
+        section_rules = {
+            rule.seccion_id: rule
+            for rule in ReglaSeccion.objects.filter(
+                evento=self.event,
+                boletab_evento_id=data["boletab_evento_id"],
+                seccion_id__in=selected_sections,
+            )
+        }
+        for section_id, section_rule in section_rules.items():
+            section_place_ids = places_by_section.get(section_id, set())
+            individual_count = len(
+                section_place_ids & (existing_individual_ids | selected_ids)
+            )
+            global_limit = max(len(section_place_ids) - individual_count, 0)
+            allocated = sum(
+                int(item.get("cantidad") or 0) for item in section_rule.reglas
+            )
+            if allocated > global_limit:
+                return error_response(
+                    "No puedes configurar este stand individualmente porque la "
+                    f"sección tiene {allocated} lugares asignados globalmente y, "
+                    f"con este cambio, solo quedarían {global_limit}. Reduce primero "
+                    "la capacidad global de la sección."
+                )
+
+        giros = list(dict.fromkeys(rule["giro"] for rule in data["reglas_json"]))
+        subgiros = list(
+            dict.fromkeys(
+                rule["subgiro"]
+                for rule in data["reglas_json"]
+                if rule["subgiro"]
+            )
+        )
+        with transaction.atomic():
+            for asiento_id in data["asiento_ids_json"]:
+                place = valid_places[asiento_id]
+                ReglaEspacio.objects.update_or_create(
+                    evento=self.event,
+                    boletab_evento_id=data["boletab_evento_id"],
+                    asiento_id=asiento_id,
+                    defaults={
+                        "etiqueta": place.get("etiqueta") or "",
+                        "reglas": data["reglas_json"],
+                        "giros": giros,
+                        "subgiros": subgiros,
+                        "folios": data["folios"],
+                    },
+                )
+
+        saved_count = len(data["asiento_ids_json"])
+        message = f"Se guardó la configuración en {saved_count} espacio{'s' if saved_count != 1 else ''}."
+        if wants_json:
+            return JsonResponse({"message": message, "saved_count": saved_count})
+        messages.success(request, message)
         return redirect(
             f"{request.path}?{urlencode({'evento': data['boletab_evento_id']})}"
         )
@@ -354,9 +463,21 @@ class EventSpacesDataView(UserPassesTestMixin, View):
                 "giros": rule.giros if rule else [],
                 "subgiros": rule.subgiros if rule else [],
                 "folios": rule.folios if rule else [],
+                "configured": rule is not None,
             }
             if rule:
                 configured_count += 1
+
+        global_capacity = max(len(places) - configured_count, 0)
+        section_rule = ReglaSeccion.objects.filter(
+            evento=event,
+            boletab_evento_id=boletab_event_id,
+            seccion_id=request.GET.get("seccion", ""),
+        ).first()
+        allocated_capacity = sum(
+            int(item.get("cantidad") or 0)
+            for item in (section_rule.reglas if section_rule else [])
+        )
 
         coordinates = [point for place in places for point in place["coordinates"]]
         if coordinates:
@@ -376,6 +497,13 @@ class EventSpacesDataView(UserPassesTestMixin, View):
             {
                 "places": places,
                 "configured_count": configured_count,
+                "section_capacity": {
+                    "total_spaces": len(places),
+                    "individual_spaces": configured_count,
+                    "global_limit": global_capacity,
+                    "allocated": allocated_capacity,
+                    "remaining": max(global_capacity - allocated_capacity, 0),
+                },
                 "view_box": view_box,
             }
         )
@@ -399,7 +527,87 @@ class EventSectionsDataView(UserPassesTestMixin, View):
             sections = get_boletab_sections(boletab_event_id)
         except BoletabError as exc:
             return JsonResponse({"error": str(exc)}, status=502)
+        saved_rules = {
+            rule.seccion_id: rule.reglas
+            for rule in ReglaSeccion.objects.filter(
+                evento=event, boletab_evento_id=boletab_event_id
+            )
+        }
+        for section in sections:
+            section["capacity_rules"] = saved_rules.get(str(section["id"]), [])
         return JsonResponse({"sections": sections})
+
+    def post(self, request, pk):
+        event = get_object_or_404(Evento, pk=pk)
+        form = SectionRuleForm(request.POST, catalog=event.catalogo_giros)
+        if not form.is_valid():
+            first_error = next(iter(form.errors.values()))[0]
+            return JsonResponse({"error": str(first_error)}, status=400)
+
+        data = form.cleaned_data
+        linked_ids = {item["id"] for item in event.boletab_eventos}
+        if data["boletab_evento_id"] not in linked_ids:
+            return JsonResponse({"error": "El evento de Boletab no está vinculado."}, status=400)
+        try:
+            sections = get_boletab_sections(data["boletab_evento_id"])
+        except BoletabError as exc:
+            return JsonResponse({"error": str(exc)}, status=502)
+        valid_sections = {str(item["id"]): item for item in sections}
+        if data["seccion_id"] not in valid_sections:
+            return JsonResponse({"error": "La sección no pertenece al evento."}, status=400)
+
+        try:
+            places = get_boletab_places(
+                data["boletab_evento_id"], data["seccion_id"]
+            )
+        except BoletabError as exc:
+            return JsonResponse({"error": str(exc)}, status=502)
+        place_ids = {str(place.get("asientoId")) for place in places}
+        individual_spaces = ReglaEspacio.objects.filter(
+            evento=event,
+            boletab_evento_id=data["boletab_evento_id"],
+            asiento_id__in=place_ids,
+        ).count()
+        global_limit = max(len(place_ids) - individual_spaces, 0)
+        requested_capacity = sum(item["cantidad"] for item in data["reglas_json"])
+        if requested_capacity > global_limit:
+            return JsonResponse(
+                {
+                    "error": (
+                        f"La capacidad global solicitada ({requested_capacity}) supera "
+                        f"los {global_limit} espacios disponibles de la sección."
+                    ),
+                    "capacity": {
+                        "total_spaces": len(place_ids),
+                        "individual_spaces": individual_spaces,
+                        "global_limit": global_limit,
+                    },
+                },
+                status=400,
+            )
+
+        section = valid_sections[data["seccion_id"]]
+        ReglaSeccion.objects.update_or_create(
+            evento=event,
+            boletab_evento_id=data["boletab_evento_id"],
+            seccion_id=data["seccion_id"],
+            defaults={
+                "seccion_nombre": section.get("nombre") or "",
+                "reglas": data["reglas_json"],
+            },
+        )
+        return JsonResponse(
+            {
+                "message": "Se guardó la capacidad de la sección.",
+                "capacity": {
+                    "total_spaces": len(place_ids),
+                    "individual_spaces": individual_spaces,
+                    "global_limit": global_limit,
+                    "allocated": requested_capacity,
+                    "remaining": global_limit - requested_capacity,
+                },
+            }
+        )
 
 
 class AdminLogoutView(LogoutView):

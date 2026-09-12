@@ -119,12 +119,14 @@ class EventCreateForm(forms.ModelForm):
         help_text="Puedes seleccionar varios eventos manteniendo presionada la tecla Ctrl.",
     )
     catalogo_giros = forms.CharField(required=False, widget=forms.HiddenInput)
+    catalogo_folios = forms.CharField(required=False, widget=forms.HiddenInput)
 
     class Meta:
         model = Evento
         fields = (
             "boletab_eventos",
             "catalogo_giros",
+            "catalogo_folios",
             "nombre",
             "descripcion",
             "imagen",
@@ -155,10 +157,14 @@ class EventCreateForm(forms.ModelForm):
             self.initial["catalogo_giros"] = json.dumps(
                 self.instance.catalogo_giros or self._legacy_catalog(), ensure_ascii=False
             )
+            self.initial["catalogo_folios"] = json.dumps(
+                self.instance.catalogo_folios, ensure_ascii=False
+            )
         for name, field in self.fields.items():
             field.widget.attrs["class"] = (
                 "form-checkbox" if name == "visible" else "form-input"
             )
+        self.fields["catalogo_folios"].widget.attrs["x-ref"] = "catalogInput"
 
     def clean_imagen(self):
         imagen = self.cleaned_data["imagen"]
@@ -229,16 +235,45 @@ class EventCreateForm(forms.ModelForm):
             item for item in self.boletab_events if item["id"] in selected_ids
         ]
         event.catalogo_giros = self.cleaned_data["catalogo_giros"]
+        event.catalogo_folios = self.cleaned_data["catalogo_folios"]
         event.giros_disponibles = [giro["id"] for giro in event.catalogo_giros]
         event.subgiros_disponibles = [subgiro["id"] for giro in event.catalogo_giros for subgiro in giro["subgiros"]]
         if commit:
             event.save()
         return event
 
+    def clean_catalogo_folios(self):
+        raw = self.cleaned_data.get("catalogo_folios") or "[]"
+        try:
+            catalog = json.loads(raw)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise forms.ValidationError("El catálogo de folios no es válido.") from exc
+        if not isinstance(catalog, list):
+            raise forms.ValidationError("El catálogo de folios no es válido.")
+
+        valid_types = {"PROGRAMA_SOCIAL", "PATROCINADOR"}
+        result, used_codes = [], set()
+        for item in catalog:
+            if not isinstance(item, dict):
+                raise forms.ValidationError("La información de un folio no es válida.")
+            code = str(item.get("codigo") or "").strip().upper()
+            folio_type = str(item.get("tipo") or "").strip().upper()
+            if not code or not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]{3,63}", code):
+                raise forms.ValidationError(
+                    "Cada folio debe tener entre 4 y 64 caracteres: letras, números, guion o guion bajo."
+                )
+            if code in used_codes:
+                raise forms.ValidationError("Los códigos de folio no pueden repetirse.")
+            if folio_type not in valid_types:
+                raise forms.ValidationError("Selecciona un tipo válido para cada folio.")
+            used_codes.add(code)
+            result.append({"codigo": code, "tipo": folio_type})
+        return result
+
 
 class SpaceRuleForm(forms.Form):
     boletab_evento_id = forms.CharField(widget=forms.HiddenInput)
-    asiento_id = forms.CharField(widget=forms.HiddenInput)
+    asiento_ids_json = forms.CharField(widget=forms.HiddenInput)
     etiqueta = forms.CharField(required=False, widget=forms.HiddenInput)
     reglas_json = forms.CharField(required=False, widget=forms.HiddenInput)
     folios = forms.CharField(
@@ -248,9 +283,10 @@ class SpaceRuleForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, catalog=None, **kwargs):
+    def __init__(self, *args, catalog=None, folio_catalog=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.catalog = catalog
+        self.folio_catalog = folio_catalog or []
         self.fields["folios"].widget.attrs["x-model"] = "selected.foliosText"
 
     def clean_reglas_json(self):
@@ -283,4 +319,77 @@ class SpaceRuleForm(forms.Form):
     def clean_folios(self):
         raw_value = self.cleaned_data["folios"]
         values = raw_value.replace(",", "\n").splitlines()
-        return list(dict.fromkeys(value.strip().upper() for value in values if value.strip()))
+        cleaned = list(dict.fromkeys(value.strip().upper() for value in values if value.strip()))
+        valid_folios = {item["codigo"] for item in self.folio_catalog}
+        if set(cleaned) - valid_folios:
+            raise forms.ValidationError("Selecciona únicamente folios configurados para el evento.")
+        return cleaned
+
+    def clean_asiento_ids_json(self):
+        raw_value = self.cleaned_data.get("asiento_ids_json") or "[]"
+        try:
+            asiento_ids = json.loads(raw_value)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise forms.ValidationError("Los espacios seleccionados no son válidos.") from exc
+        if not isinstance(asiento_ids, list):
+            raise forms.ValidationError("Los espacios seleccionados no son válidos.")
+
+        cleaned = list(dict.fromkeys(str(value).strip() for value in asiento_ids))
+        if not cleaned or any(not value for value in cleaned):
+            raise forms.ValidationError("Selecciona al menos un espacio.")
+        return cleaned
+
+    def clean(self):
+        cleaned_data = super().clean()
+        rules = cleaned_data.get("reglas_json") or []
+        folios = cleaned_data.get("folios") or []
+        if rules and folios:
+            raise forms.ValidationError(
+                "El espacio debe configurarse por giro y subgiro o por folio, no por ambos."
+            )
+        if not rules and not folios:
+            raise forms.ValidationError(
+                "Agrega al menos una regla de giro y subgiro o un folio."
+            )
+        return cleaned_data
+
+
+class SectionRuleForm(forms.Form):
+    boletab_evento_id = forms.CharField()
+    seccion_id = forms.CharField()
+    reglas_json = forms.CharField()
+
+    def __init__(self, *args, catalog=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.catalog = catalog or []
+
+    def clean_reglas_json(self):
+        try:
+            rules = json.loads(self.cleaned_data["reglas_json"])
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise forms.ValidationError("Las capacidades de la sección no son válidas.") from exc
+        if not isinstance(rules, list) or not rules:
+            raise forms.ValidationError("Agrega al menos una capacidad a la sección.")
+
+        valid_giros = {item["id"]: item for item in self.catalog}
+        cleaned, combinations = [], set()
+        for rule in rules:
+            giro = str(rule.get("giro") or "") if isinstance(rule, dict) else ""
+            subgiro = str(rule.get("subgiro") or "") if isinstance(rule, dict) else ""
+            try:
+                cantidad = int(rule.get("cantidad"))
+            except (TypeError, ValueError, AttributeError) as exc:
+                raise forms.ValidationError("Indica una cantidad válida en cada capacidad.") from exc
+            valid_subgiros = {
+                item["id"] for item in valid_giros.get(giro, {}).get("subgiros", [])
+            }
+            if giro not in valid_giros or subgiro not in valid_subgiros:
+                raise forms.ValidationError("Selecciona un giro y subgiro válidos.")
+            if cantidad < 1:
+                raise forms.ValidationError("La cantidad debe ser mayor que cero.")
+            combination = (giro, subgiro)
+            if combination in combinations:
+                raise forms.ValidationError("No repitas un giro y subgiro en la sección.")
+            combinations.add(combination)
+            cleaned.append({"giro": giro, "subgiro": subgiro, "cantidad": cantidad})
+        return cleaned

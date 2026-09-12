@@ -5,6 +5,7 @@ from django.db import models
 class Evento(models.Model):
     boletab_eventos = models.JSONField("eventos de Boletab", default=list, blank=True)
     catalogo_giros = models.JSONField(default=list, blank=True)
+    catalogo_folios = models.JSONField(default=list, blank=True)
     giros_disponibles = models.JSONField(default=list, blank=True)
     subgiros_disponibles = models.JSONField(default=list, blank=True)
     nombre = models.CharField(max_length=180)
@@ -47,3 +48,24 @@ class ReglaEspacio(models.Model):
         ]
         verbose_name = "regla de espacio"
         verbose_name_plural = "reglas de espacios"
+
+
+class ReglaSeccion(models.Model):
+    evento = models.ForeignKey(
+        Evento, on_delete=models.CASCADE, related_name="reglas_secciones"
+    )
+    boletab_evento_id = models.CharField(max_length=100)
+    seccion_id = models.CharField(max_length=100)
+    seccion_nombre = models.CharField(max_length=250, blank=True)
+    reglas = models.JSONField(default=list, blank=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("evento", "boletab_evento_id", "seccion_id"),
+                name="regla_unica_por_seccion_boletab",
+            )
+        ]
+        verbose_name = "regla de sección"
+        verbose_name_plural = "reglas de secciones"

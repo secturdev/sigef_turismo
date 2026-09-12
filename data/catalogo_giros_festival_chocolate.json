@@ -1,0 +1,244 @@
+[
+    {
+        "nombre":  "AGROINDUSTRIA, CACAO Y CHOCOLATE",
+        "descripcion":  "Actividades, productos y servicios relacionados con AGROINDUSTRIA, CACAO Y CHOCOLATE.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Producción Agrícola y Viveros",
+                             "descripcion":  "Producción primaria y propagación vegetal vinculada al cultivo sustentable de cacao y plantas agroforestales."
+                         },
+                         {
+                             "nombre":  "Producción de Cacao",
+                             "descripcion":  "Unidades productivas y productores individuales dedicados al cultivo y cosecha de cacao criollo y variedades locales."
+                         },
+                         {
+                             "nombre":  "Beneficio y Poscosecha de Cacao",
+                             "descripcion":  "Procesos poscosecha de fermentación en baba, secado al sol, selección, clasificación y almacenamiento de granos finos."
+                         },
+                         {
+                             "nombre":  "Transformación Primaria de Cacao",
+                             "descripcion":  "Tostado, descascarillado, molienda, obtención de licor de cacao, pasta, manteca natural y polvo de cacao."
+                         },
+                         {
+                             "nombre":  "Fabricación de Chocolate",
+                             "descripcion":  "Elaboración de chocolate de mesa, barras finas de origen, coberturas gourmet y formulaciones reposteras."
+                         },
+                         {
+                             "nombre":  "Chocolatería y Confitería de Chocolate",
+                             "descripcion":  "Bombones rellenos, trufas de autor, tabletas de diseño y piezas artísticas de chocolatería fina."
+                         },
+                         {
+                             "nombre":  "Derivados y Productos a Base de Cacao",
+                             "descripcion":  "Alimentos especializados, mezclas gastronómicas, nibs caramelizados e insumos alimenticios derivados de cacao."
+                         },
+                         {
+                             "nombre":  "Maquinaria, Equipamiento, Empaque e Insumos Agroindustriales",
+                             "descripcion":  "Maquinaria para tostado/refinado, molinos, moldes, empaques ecológicos y equipamiento agroindustrial."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "GASTRONOMÍA Y EXPERIENCIAS CULINARIAS",
+        "descripcion":  "Actividades, productos y servicios relacionados con GASTRONOMÍA Y EXPERIENCIAS CULINARIAS.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Cocina Tradicional Tabasqueña",
+                             "descripcion":  "Recetas autóctonas, horneados con costra de cacao, claveteado, tamales tradicionales y cocina de humo."
+                         },
+                         {
+                             "nombre":  "Cocina Regional Mexicana",
+                             "descripcion":  "Expresiones culinarias representativas del sureste y estados invitados que incorporan ingredientes autóctonos."
+                         },
+                         {
+                             "nombre":  "Restaurantes y Servicios Gastronómicos",
+                             "descripcion":  "Establecimientos y servicios de comida formal con menús de autor y platillos especiales para el festival."
+                         },
+                         {
+                             "nombre":  "Repostería y Panadería",
+                             "descripcion":  "Panes artesanales, pasteles, galletas horneadas y productos de panadería fina con cacao y chocolate."
+                         },
+                         {
+                             "nombre":  "Postres y Dulces",
+                             "descripcion":  "Elaboración de postres regionales, dulces tradicionales, garapiñados y confitería típica tabasqueña."
+                         },
+                         {
+                             "nombre":  "Heladería y Productos Congelados",
+                             "descripcion":  "Helados artesanales, nieves de chocolate de agua, paletas y frappés a base de cacao e ingredientes locales."
+                         },
+                         {
+                             "nombre":  "Experiencias Gastronómicas",
+                             "descripcion":  "Catas guiadas de chocolates finos de aroma, maridajes con destilados y cenas temáticas multisensoriales."
+                         },
+                         {
+                             "nombre":  "Demostraciones y Actividades Culinarias",
+                             "descripcion":  "Talleres de cocina en vivo, democonferencias de chocolatería dictadas por chefs y actividades interactivas."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "BEBIDAS NO ALCOHÓLICAS",
+        "descripcion":  "Actividades, productos y servicios relacionados con BEBIDAS NO ALCOHÓLICAS.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Café",
+                             "descripcion":  "Café de especialidad, tostado en grano, métodos de extracción artesanal y maridajes café-chocolate."
+                         },
+                         {
+                             "nombre":  "Cacao y Bebidas de Chocolate",
+                             "descripcion":  "Pozol tradicional, polvillo, pinole, chocolate frío espumado, chorote y bebidas ceremoniales prehispánicas."
+                         },
+                         {
+                             "nombre":  "Té e Infusiones",
+                             "descripcion":  "Tés herbales, infusiones de cascarilla de cacao, blends florales y tisanas artesanales aromáticas."
+                         },
+                         {
+                             "nombre":  "Aguas y Bebidas Tradicionales",
+                             "descripcion":  "Aguas frescas de frutas de la temporada, matalí, pozol blanco, chicha no alcohólica y bebidas típicas."
+                         },
+                         {
+                             "nombre":  "Concentrados, Jarabes y Mezclas para Bebidas",
+                             "descripcion":  "Jarabes de cacao, pulpas de frutas, concentrados naturales y bases para preparación rápida de bebidas."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "BEBIDAS ALCOHÓLICAS",
+        "descripcion":  "Actividades, productos y servicios relacionados con BEBIDAS ALCOHÓLICAS.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Licores",
+                             "descripcion":  "Licores artesanales de cacao, chocolate a la crema, frutos tropicales y formulaciones regionales."
+                         },
+                         {
+                             "nombre":  "Destilados",
+                             "descripcion":  "Ron de caña tabasqueño, mezcales artesanales invitados y aguardientes destilados con notas de cacao."
+                         },
+                         {
+                             "nombre":  "Cerveza Artesanal",
+                             "descripcion":  "Cervezas artesanales con adición de nibs de cacao, stout chocolatosa y cervezas de autor tabasqueñas."
+                         },
+                         {
+                             "nombre":  "Bebidas Fermentadas",
+                             "descripcion":  "Vinos y fermentados elaborados a partir del mucílago de cacao fresco y bebidas fermentadas tradicionales."
+                         },
+                         {
+                             "nombre":  "Coctelería y Preparaciones",
+                             "descripcion":  "Mixología especializada basada en destilados regionales con infusión de cacao, amargos y bitters."
+                         },
+                         {
+                             "nombre":  "Vinos",
+                             "descripcion":  "Vinos de mesa, tintos, blancos y espumosos para maridaje especializado con chocolates y quesos artesanales."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "ALIMENTOS PROCESADOS",
+        "descripcion":  "Actividades, productos y servicios relacionados con ALIMENTOS PROCESADOS.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Salsas y Aderezos",
+                             "descripcion":  "Moles con pasta de cacao criollo, aderezos agridulces, salsas de habanero con notas de chocolate y marinados."
+                         },
+                         {
+                             "nombre":  "Mermeladas, Jaleas y Untables",
+                             "descripcion":  "Untables artesanales de cacao con avellana, mermeladas de frutas combinadas con chocolate y mieles untables."
+                         },
+                         {
+                             "nombre":  "Lácteos y Derivados (Quesos de Origen)",
+                             "descripcion":  "Quesos de origen artesanal tabasqueño (queso de poro de Balancán, queso de hebra y ahumados), ideales para tablas de maridaje con chocolate oscuro y vinos."
+                         },
+                         {
+                             "nombre":  "Productos Cárnicos Procesados (Charcutería Artesanal)",
+                             "descripcion":  "Embutidos madurados, jamones artesanales y charcutería regional para maridaje con cacao, chocolate y vinos."
+                         },
+                         {
+                             "nombre":  "Miel y Productos Apícolas",
+                             "descripcion":  "Miel pura de abeja melipona y europea, polen y derivados apícolas utilizados como endulzantes del cacao."
+                         },
+                         {
+                             "nombre":  "Condimentos, Especias y Mezclas",
+                             "descripcion":  "Vainilla natural, canela, pimienta gorda, cardamomo y mezclas de especias empleadas en chocolatería y cocina."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "IDENTIDAD, ARTESANÍA, DISEÑO Y PRODUCTOS CULTURALES",
+        "descripcion":  "Actividades, productos y servicios relacionados con IDENTIDAD, ARTESANÍA, DISEÑO Y PRODUCTOS CULTURALES.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Artesanía Tradicional",
+                             "descripcion":  "Jícaras labradas para servir pozol, molinillos de madera torneada, cestería y telares de cintura chontales."
+                         },
+                         {
+                             "nombre":  "Cerámica y Alfarería",
+                             "descripcion":  "Chocolateras de barro vidriado, tazas ceremoniales, jarrones y piezas utilitarias para el servicio de chocolate."
+                         },
+                         {
+                             "nombre":  "Madera y Talla",
+                             "descripcion":  "Molinillos tallados a mano para espumar cacao, tablas de presentación de quesos y chocolates, bateas de madera."
+                         },
+                         {
+                             "nombre":  "Souvenirs y Productos Culturales",
+                             "descripcion":  "Artículos conmemorativos del festival, postales temáticas, libretas y recuerdos de la cultura del cacao."
+                         },
+                         {
+                             "nombre":  "Arte y Obra Gráfica",
+                             "descripcion":  "Pintura, grabado, fotografía artística y expresiones visuales inspiradas en la cultura del cacao y el cacao tabasqueño."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "SALUD, BIENESTAR Y CUIDADO PERSONAL",
+        "descripcion":  "Actividades, productos y servicios relacionados con SALUD, BIENESTAR Y CUIDADO PERSONAL.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Cosmética Natural y Artesanal",
+                             "descripcion":  "Productos cosméticos elaborados con manteca de cacao virgen, jabones exfoliantes de cacao y chocoterapia."
+                         },
+                         {
+                             "nombre":  "Cremas y Cuidado de la Piel",
+                             "descripcion":  "Cremas corporales nutritivas de manteca de cacao, bálsamos labiales protectores y aceites regeneradores."
+                         },
+                         {
+                             "nombre":  "Aromaterapia y Bienestar",
+                             "descripcion":  "Velas aromáticas con manteca de cacao, esencias, difusores y productos de bienestar y ambientación sensorial."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "SERVICIOS, INSTITUCIONES Y VINCULACIÓN ESTRATÉGICA",
+        "descripcion":  "Actividades, productos y servicios relacionados con SERVICIOS, INSTITUCIONES Y VINCULACIÓN ESTRATÉGICA.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Compradores y Vinculación B2B",
+                             "descripcion":  "Mesas de negociación comercial, cadenas de autoservicio (Walmart, Chedraui, Grupo Sánchez) e inversionistas."
+                         },
+                         {
+                             "nombre":  "Servicios Turísticos",
+                             "descripcion":  "Agencias de viajes, haciendas cacaoteras turísticas, touroperadores y rutas turísticas del Cacao al Chocolate."
+                         },
+                         {
+                             "nombre":  "Promoción y Desarrollo Turístico",
+                             "descripcion":  "Stands institucionales de municipios cacaoteros, pabellón del Mundo Maya, Pueblos Mágicos y difusión de destino."
+                         },
+                         {
+                             "nombre":  "Empaque y Servicios para Productos",
+                             "descripcion":  "Soluciones de empaque ecológico, diseño, estuches rígidos y envolturas grado alimenticio para barras y confitería."
+                         },
+                         {
+                             "nombre":  "Instituciones Académicas y de Investigación",
+                             "descripcion":  "Universidades, carreras gastronómicas, centros de investigación biotecnológica del cacao y concurso de promesas del chocolate."
+                         }
+                     ]
+    },
+    {
+        "nombre":  "HOGAR, TECNOLOGÍA Y ARTÍCULOS RECREATIVOS",
+        "descripcion":  "Actividades, productos y servicios relacionados con HOGAR, TECNOLOGÍA Y ARTÍCULOS RECREATIVOS.",
+        "subgiros":  [
+                         {
+                             "nombre":  "Utensilios y Artículos para Cocina",
+                             "descripcion":  "Moldes de policarbonato y silicona, termómetros, espátulas y equipamiento especializado para chocolatería casera y profesional."
+                         }
+                     ]
+    }
+]
