@@ -36,21 +36,29 @@
         </select>
       </div>
     </div>
+    {% if allow_template_simulation %}
+      <button type="button" class="btn-outline space-simulation-button" x-show="!simulationActive"
+        :disabled="!placeList.length" @click="simulateTemplateChange()">Simular cambio de plantilla</button>
+      <button type="button" class="btn-outline space-simulation-button" x-show="simulationActive"
+        @click="stopTemplateSimulation()">Salir de simulación</button>
+    {% endif %}
     <!-- <div class="space-toolbar__summary">
       Total: <strong x-text="placeList.length"></strong> espacios ·
       <strong x-text="configuredCount"></strong> configurados
     </div> -->
   </div>
 
-  <div class="section-capacity">
-    <div class="space-rule-group__heading">
+  <div class="space-config-layout">
+  <aside class="section-capacity">
+    <div class="section-capacity__bar">
       <div>
         <h3>Capacidad por giro y subgiro de la sección</h3>
         <p class="form-help">Aplica a los stands sin configuración individual dentro de esta sección.</p>
       </div>
-      <button type="button" class="btn-outline" @click="addSectionRule()" :disabled="!sectionId">Agregar
-        capacidad</button>
+      <button type="button" class="section-capacity__toggle" @click="globalPanelOpen = !globalPanelOpen"
+        :aria-expanded="globalPanelOpen" x-text="globalPanelOpen ? 'Ocultar' : 'Configurar'"></button>
     </div>
+    <div class="section-capacity__content" x-show="globalPanelOpen">
     <div class="space-rule-summary section-capacity__summary">
       <div><span>Total de la sección</span><strong x-text="sectionCapacity.total_spaces"></strong></div>
       <div><span>Con regla individual</span><strong x-text="sectionCapacity.individual_spaces"></strong></div>
@@ -66,20 +74,29 @@
       <div class="space-rule-builder">
         <template x-for="(rule, index) in sectionRules" :key="index">
           <div class="space-rule-row section-capacity__row">
-            <select class="form-input" x-model="rule.giro" @change="rule.subgiro = ''" required>
-              <option value="">Selecciona un giro</option>
-              <template x-for="giro in catalog.giros" :key="giro.id">
-                <option :value="giro.id" x-text="giro.name"></option>
-              </template>
-            </select>
-            <select class="form-input" x-model="rule.subgiro" :disabled="!rule.giro" required>
-              <option value="">Selecciona un subgiro</option>
-              <template x-for="subgiro in subgirosFor(rule.giro)" :key="subgiro.id">
-                <option :value="subgiro.id" x-text="subgiro.name"></option>
-              </template>
-            </select>
-            <input class="form-input" type="number" x-model.number="rule.cantidad" min="1" placeholder="Cantidad"
-              required />
+            <div class="form-field">
+              <label class="form-label">Giro</label>
+              <select class="form-input" x-model="rule.giro" @change="rule.subgiro = ''" required>
+                <option value="">Selecciona un giro</option>
+                <template x-for="giro in catalog.giros" :key="giro.id">
+                  <option :value="String(giro.id)" :selected="rule.giro === String(giro.id)" x-text="giro.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Subgiro</label>
+              <select class="form-input" x-model="rule.subgiro" :disabled="!rule.giro" required>
+                <option value="">Selecciona un subgiro</option>
+                <template x-for="subgiro in subgirosFor(rule.giro)" :key="subgiro.id">
+                  <option :value="String(subgiro.id)" :selected="rule.subgiro === String(subgiro.id)" x-text="subgiro.name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Cantidad de stands</label>
+              <input class="form-input" type="number" x-model.number="rule.cantidad" min="1"
+                placeholder="Cantidad" required />
+            </div>
             <button type="button" class="space-rule-row__remove" @click="removeSectionRule(index)"
               aria-label="Eliminar capacidad">&times;</button>
           </div>
@@ -87,11 +104,31 @@
         <p class="space-rule-builder__empty" x-show="!sectionRules.length">Esta sección no tiene capacidades
           configuradas.</p>
       </div>
+      <button type="button" class="btn-outline" @click="addSectionRule()" :disabled="!sectionId">Agregar regla</button>
       <p class="form-help" x-show="sectionSaveMessage" x-text="sectionSaveMessage" role="status"></p>
       <p class="form-error" x-show="sectionSaveError" x-text="sectionSaveError" role="alert"></p>
-      <button type="submit" class="btn-primary" :disabled="sectionSaving || !sectionRules.length"
-        x-text="sectionSaving ? 'Guardando…' : 'Guardar capacidad de sección'"></button>
+      <button type="submit" class="btn-primary" :disabled="sectionSaving || !sectionId"
+        x-text="sectionSaving ? 'Guardando…' : (sectionRules.length ? 'Guardar capacidad de sección' : 'Guardar sección sin reglas')"></button>
     </form>
+    </div>
+  </aside>
+
+  <div class="space-template-warning" x-show="templateWarnings.length" role="alert">
+    <div>
+      <span class="space-template-warning__badge" x-show="simulationActive">Simulación local</span>
+      <strong x-text="`Boletab modificó la plantilla: ${templateWarnings.length} configuración${templateWarnings.length === 1 ? '' : 'es'} requiere${templateWarnings.length === 1 ? '' : 'n'} revisión.`"></strong>
+      <template x-for="warning in templateWarnings" :key="warning.asiento_id">
+        <p><span x-text="`${warning.etiqueta} (${warning.asiento_id})`"></span>: <span x-text="warning.motivo"></span></p>
+      </template>
+    </div>
+    <button type="button" class="btn-outline" x-show="!staleConfirming" @click="staleConfirming = true">
+      Revisar eliminación
+    </button>
+    <div class="space-template-warning__actions" x-show="staleConfirming">
+      <button type="button" class="btn-outline" @click="staleConfirming = false">Conservar</button>
+      <button type="button" class="btn-primary" :disabled="clearingStale" @click="clearStaleRules()"
+        x-text="clearingStale ? 'Eliminando…' : 'Eliminar configuraciones'"></button>
+    </div>
   </div>
 
   <div class="space-map-layout">
@@ -133,7 +170,12 @@
             x-text="selectedIds.length === 1 ? (selected.etiqueta || 'Sin etiqueta') : 'Configuración compartida'"></h2>
           <p class="form-help" x-show="selectedIds.length > 1">Al guardar, esta configuración se aplicará a todos los
             espacios seleccionados.</p>
-          <dl class="space-detail__list">
+          <div class="space-selection-list" x-show="selectedIds.length > 1">
+            <template x-for="spaceId in selectedIds" :key="spaceId">
+              <span x-text="places[spaceId]?.etiqueta || `Stand ${spaceId}`"></span>
+            </template>
+          </div>
+          <dl class="space-detail__list" x-show="selectedIds.length === 1">
             <div>
               <dt>Sección</dt>
               <dd x-text="selected.seccionNombre || '—'"></dd>
@@ -206,7 +248,7 @@
                         x-effect="$nextTick(() => { $el.value = rule.giro })" @change="rule.subgiro = ''" required>
                         <option value="">Selecciona un giro</option>
                         <template x-for="giro in catalog.giros" :key="giro.id">
-                          <option :value="giro.id" :selected="rule.giro === giro.id" x-text="giro.name"></option>
+                          <option :value="String(giro.id)" :selected="rule.giro === String(giro.id)" x-text="giro.name"></option>
                         </template>
                       </select>
                     </div>
@@ -216,7 +258,7 @@
                         x-effect="$nextTick(() => { $el.value = rule.subgiro })" :disabled="!rule.giro">
                         <option value="">Cualquier subgiro</option>
                         <template x-for="subgiro in subgirosFor(rule.giro)" :key="subgiro.id">
-                          <option :value="subgiro.id" :selected="rule.subgiro === subgiro.id" x-text="subgiro.name">
+                          <option :value="String(subgiro.id)" :selected="rule.subgiro === String(subgiro.id)" x-text="subgiro.name">
                           </option>
                         </template>
                       </select>
@@ -252,14 +294,25 @@
               <p class="form-error" x-show="saveError" x-text="saveError" role="alert"></p>
               <button type="submit" class="btn-primary w-full" :disabled="saving"
                 x-text="saving ? 'Guardando…' : `Guardar en ${selectedIds.length} espacio${selectedIds.length === 1 ? '' : 's'}`"></button>
-              <button type="button" class="btn-outline w-full" x-show="selectedSpacesHaveIndividualRules"
-                :disabled="clearing" @click="clearSpaceRules()"
-                x-text="clearing ? 'Quitando…' : 'Quitar configuración individual'"></button>
+              <button type="button" class="btn-outline w-full"
+                x-show="selectedSpacesHaveIndividualRules && !confirmingClear"
+                :disabled="clearing" @click="confirmingClear = true">Quitar configuración individual</button>
+              <div class="space-rule-builder" x-show="selectedSpacesHaveIndividualRules && confirmingClear">
+                <p class="form-help"
+                  x-text="`¿Quitar la configuración individual de ${selectedIds.filter(id => places[id]?.rules.configured).length} stand${selectedIds.filter(id => places[id]?.rules.configured).length === 1 ? '' : 's'}? Después heredará las reglas globales de la sección.`"></p>
+                <div class="space-rule-row">
+                  <button type="button" class="btn-outline" :disabled="clearing"
+                    @click="confirmingClear = false">Cancelar</button>
+                  <button type="button" class="btn-primary" :disabled="clearing" @click="clearSpaceRules()"
+                    x-text="clearing ? 'Quitando…' : 'Sí, quitar reglas'"></button>
+                </div>
+              </div>
             </form>
           </div>
         </div>
       </template>
     </aside>
+  </div>
   </div>
 </section>
 {% endblock content %}
@@ -278,6 +331,7 @@
       sectionRules: [],
       sectionCapacity: { total_spaces: 0, individual_spaces: 0, global_limit: 0, allocated: 0, remaining: 0 },
       sectionSaving: false,
+      globalPanelOpen: false,
       sectionSaveMessage: '',
       sectionSaveError: '',
       catalog,
@@ -290,6 +344,12 @@
       selectedIds: [],
       saving: false,
       clearing: false,
+      confirmingClear: false,
+      templateWarnings: [],
+      staleConfirming: false,
+      clearingStale: false,
+      simulationActive: false,
+      realTemplateWarnings: [],
       saveMessage: '',
       saveError: '',
       baseViewBox: { ...emptyViewBox },
@@ -397,6 +457,10 @@
           );
           this.configuredCount = data.configured_count || 0;
           this.sectionCapacity = data.section_capacity || { total_spaces: 0, individual_spaces: 0, global_limit: 0, allocated: 0, remaining: 0 };
+          this.templateWarnings = data.template_warnings || [];
+          this.realTemplateWarnings = this.templateWarnings.map(item => ({ ...item }));
+          this.simulationActive = false;
+          this.staleConfirming = false;
           this.baseViewBox = { ...(data.view_box || emptyViewBox) };
           this.resetView();
 
@@ -408,6 +472,9 @@
           this.places = {};
           this.configuredCount = 0;
           this.sectionCapacity = { total_spaces: 0, individual_spaces: 0, global_limit: 0, allocated: 0, remaining: 0 };
+          this.templateWarnings = [];
+          this.realTemplateWarnings = [];
+          this.simulationActive = false;
           this.error = error.message;
         } finally {
           this.loading = false;
@@ -419,7 +486,7 @@
       },
       loadSectionRules() {
         const section = this.sections.find(item => String(item.id) === String(this.sectionId));
-        this.sectionRules = (section?.capacity_rules || []).map(rule => ({ ...rule }));
+        this.sectionRules = (section?.capacity_rules || []).map(rule => this.normalizeRule(rule, true));
         this.sectionSaveMessage = '';
         this.sectionSaveError = '';
       },
@@ -432,15 +499,20 @@
         this.sectionSaveMessage = '';
         this.sectionSaveError = '';
         try {
+          const formData = new FormData(event.currentTarget);
+          formData.set('boletab_evento_id', String(this.eventId));
+          formData.set('seccion_id', String(this.sectionId));
+          formData.set('reglas_json', JSON.stringify(this.sectionRules));
           const response = await fetch(this.sectionsApiUrl, {
             method: 'POST',
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin',
-            body: new FormData(event.currentTarget)
+            body: formData
           });
           const data = await this.readJsonResponse(response);
           if (!response.ok) throw new Error(data.error || 'No fue posible guardar la capacidad.');
           const section = this.sections.find(item => String(item.id) === String(this.sectionId));
+          this.sectionRules = (data.rules || []).map(rule => this.normalizeRule(rule, true));
           if (section) section.capacity_rules = this.sectionRules.map(rule => ({ ...rule }));
           this.sectionCapacity = data.capacity;
           this.sectionSaveMessage = data.message;
@@ -451,6 +523,7 @@
         }
       },
       selectPlace(id) {
+        this.confirmingClear = false;
         if (this.panMoved) {
           this.panMoved = false;
           return;
@@ -480,10 +553,11 @@
         this.selected = {
           ...place,
           rules: {
-            reglas: (place.rules.reglas || []).map(rule => ({ ...rule })),
-            giros: [...place.rules.giros],
-            subgiros: [...place.rules.subgiros],
-            folios: [...place.rules.folios]
+            reglas: (place.rules.reglas || []).map(rule => this.normalizeRule(rule)),
+            giros: (place.rules.giros || []).map(String),
+            subgiros: (place.rules.subgiros || []).map(String),
+            folios: (place.rules.folios || []).map(String),
+            configured: Boolean(place.rules.configured)
           },
           foliosText: place.rules.folios.join('\n')
         };
@@ -505,32 +579,53 @@
         }
         this.selected.foliosText = this.selected.rules.folios.join('\n');
       },
-      subgirosFor(giro) { return this.catalog.subgiros[giro] || []; },
+      normalizeRule(rule, withQuantity = false) {
+        const normalized = {
+          giro: String(rule?.giro ?? ''),
+          subgiro: String(rule?.subgiro ?? '')
+        };
+        if (withQuantity) normalized.cantidad = Number(rule?.cantidad) || 1;
+        return normalized;
+      },
+      subgirosFor(giro) { return this.catalog.subgiros[String(giro)] || []; },
       async saveRules(event) {
         this.saving = true;
         this.saveMessage = '';
         this.saveError = '';
         try {
+          const formData = new FormData(event.currentTarget);
+          formData.set('boletab_evento_id', String(this.eventId));
+          formData.set('asiento_ids_json', JSON.stringify(this.selectedIds));
+          formData.set('reglas_json', JSON.stringify(this.selected.rules.reglas));
+          formData.set('folios', this.selected.rules.folios.join('\n'));
           const response = await fetch(window.location.href, {
             method: 'POST',
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin',
-            body: new FormData(event.currentTarget)
+            body: formData
           });
           const data = await this.readJsonResponse(response);
           if (!response.ok) throw new Error(data.error || 'No fue posible guardar la configuración.');
 
-          const rules = this.selected.rules.reglas.map(rule => ({ ...rule }));
-          const folios = [...this.selected.rules.folios];
+          const persistedRules = data.rules || {};
+          const rules = (persistedRules.reglas || []).map(rule => ({ ...rule }));
+          const folios = [...(persistedRules.folios || [])];
           this.selectedIds.forEach(spaceId => {
             this.places[spaceId].rules = {
               reglas: rules.map(rule => ({ ...rule })),
-              giros: [...new Set(rules.map(rule => rule.giro))],
-              subgiros: [...new Set(rules.map(rule => rule.subgiro).filter(Boolean))],
+              giros: [...(persistedRules.giros || [])],
+              subgiros: [...(persistedRules.subgiros || [])],
               folios: [...new Set(folios)],
               configured: true
             };
           });
+          this.selected.rules = {
+            reglas: rules.map(rule => ({ ...rule })),
+            giros: [...(persistedRules.giros || [])],
+            subgiros: [...(persistedRules.subgiros || [])],
+            folios: [...folios],
+            configured: true
+          };
           this.configuredCount = this.placeList.filter(place =>
             place.rules.configured
           ).length;
@@ -545,11 +640,6 @@
       async clearSpaceRules() {
         const configuredIds = this.selectedIds.filter(id => this.places[id]?.rules.configured);
         if (!configuredIds.length) return;
-        const confirmed = window.confirm(
-          `Se quitará la configuración individual de ${configuredIds.length} espacio${configuredIds.length === 1 ? '' : 's'}. ¿Deseas continuar?`
-        );
-        if (!confirmed) return;
-
         this.clearing = true;
         this.saveMessage = '';
         this.saveError = '';
@@ -585,7 +675,65 @@
           this.saveError = error.message;
         } finally {
           this.clearing = false;
+          this.confirmingClear = false;
         }
+      },
+      async clearStaleRules() {
+        if (this.simulationActive) {
+          this.templateWarnings = [];
+          this.staleConfirming = false;
+          return;
+        }
+        const staleIds = this.templateWarnings.map(item => String(item.asiento_id));
+        if (!staleIds.length) return;
+        this.clearingStale = true;
+        const formData = new FormData();
+        formData.set('csrfmiddlewaretoken', this.$root.querySelector('[name=csrfmiddlewaretoken]').value);
+        formData.set('action', 'clear_space_rules');
+        formData.set('boletab_evento_id', this.eventId);
+        formData.set('asiento_ids_json', JSON.stringify(staleIds));
+        try {
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: formData
+          });
+          const data = await this.readJsonResponse(response);
+          if (!response.ok) throw new Error(data.error || 'No fue posible eliminar las configuraciones.');
+          this.templateWarnings = [];
+          this.staleConfirming = false;
+          this.saveMessage = data.message;
+        } catch (error) {
+          this.error = error.message;
+        } finally {
+          this.clearingStale = false;
+        }
+      },
+      simulateTemplateChange() {
+        const sample = this.placeList[0];
+        this.realTemplateWarnings = this.templateWarnings.map(item => ({ ...item }));
+        this.templateWarnings = [
+          {
+            asiento_id: 'SIM-AUSENTE',
+            etiqueta: 'Stand eliminado de ejemplo',
+            estado: 'AUSENTE',
+            motivo: 'El stand ya no aparece en la plantilla de Boletab.'
+          },
+          {
+            asiento_id: String(sample?.asientoId || 'SIM-MODIFICADO'),
+            etiqueta: sample?.etiqueta || 'Stand modificado de ejemplo',
+            estado: 'MODIFICADO',
+            motivo: 'El stand cambió de sección en Boletab.'
+          }
+        ];
+        this.simulationActive = true;
+        this.staleConfirming = false;
+      },
+      stopTemplateSimulation() {
+        this.templateWarnings = this.realTemplateWarnings.map(item => ({ ...item }));
+        this.simulationActive = false;
+        this.staleConfirming = false;
       },
       recalculateSectionCapacity() {
         const allocated = this.sectionRules.reduce((total, rule) => total + (Number(rule.cantidad) || 0), 0);

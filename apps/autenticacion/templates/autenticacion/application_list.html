@@ -1,0 +1,53 @@
+{% extends "layouts/admin.html" %}
+
+{% block title %}Validación de solicitudes{% endblock %}
+
+{% block content %}
+  {% include "components/_page_header.html" with title="Solicitudes de participación" subtitle="Revisa la información enviada por los expositores y emite un resultado." %}
+
+  <div class="admin-user-stats">
+    <div><span>En revisión</span><strong>{{ status_counts.EN_REVISION }}</strong></div>
+    <div><span>Aprobadas</span><strong>{{ status_counts.APROBADA }}</strong></div>
+    <div><span>Rechazadas</span><strong>{{ status_counts.RECHAZADA }}</strong></div>
+  </div>
+
+  <section class="ui-panel" x-data="{ search: '', status: 'EN_REVISION' }">
+    <div class="admin-table-toolbar">
+      <div><h2 class="admin-section-title">Bandeja de validación</h2><p>Abre una solicitud para consultar su expediente de participación.</p></div>
+      <div class="application-filters">
+        <select class="form-input" x-model="status"><option value="">Todos los estados</option><option value="EN_REVISION">En revisión</option><option value="APROBADA">Aprobadas</option><option value="RECHAZADA">Rechazadas</option></select>
+        <input class="form-input" type="search" x-model.debounce.200ms="search" placeholder="Buscar expositor" />
+      </div>
+    </div>
+
+    <div class="admin-user-list">
+      {% for application in applications %}
+        <article class="application-review" x-show="(!status || status === '{{ application.estado }}') && '{{ application.nombre_comercio|lower|escapejs }} {{ application.usuario.correo|lower|escapejs }}'.includes(search.toLowerCase())" x-cloak>
+          <details>
+            <summary>
+              <div><strong>{{ application.nombre_comercio|default:"Comercio sin nombre" }}</strong><span>{{ application.usuario.correo }} · {{ application.get_giro_display|default:"Sin giro" }}</span></div>
+              <div class="application-review__meta"><span class="badge badge--{{ application.estado|lower }}">{{ application.get_estado_display }}</span><small>{% if application.fecha_envio %}{{ application.fecha_envio|date:"d/m/Y H:i" }}{% else %}Sin enviar{% endif %}</small></div>
+            </summary>
+            <div class="application-review__body">
+              <dl class="summary-list">
+                <div><dt>Giro y subgiro</dt><dd>{{ application.get_giro_display }} · {{ application.get_subgiro_display }}</dd></div>
+                <div><dt>Programa</dt><dd>{{ application.get_programa_especial_display }}{% if application.folio_programa_social %} · {{ application.folio_programa_social }}{% endif %}</dd></div>
+                <div><dt>Producto principal</dt><dd>{{ application.producto_principal.nombre|default:"Sin definir" }}</dd></div>
+                <div><dt>Archivos</dt><dd>{% if application.logo %}<a href="{{ application.logo.url }}" target="_blank">Logo</a>{% endif %} · {{ application.imagenes.count }} imagen{{ application.imagenes.count|pluralize:"es" }}</dd></div>
+              </dl>
+              <form method="post" class="application-review__decision">
+                {% csrf_token %}<input type="hidden" name="application_id" value="{{ application.pk }}" />
+                <label class="form-field"><span class="form-label">Observaciones para el expositor</span><textarea class="form-input" name="observations" rows="3" placeholder="Obligatorias cuando se rechaza">{{ application.observaciones_validacion }}</textarea></label>
+                <div class="form-actions">
+                  <button class="btn-outline" type="submit" name="action" value="reject">Rechazar</button>
+                  <button class="btn-primary" type="submit" name="action" value="approve">Aprobar solicitud</button>
+                </div>
+              </form>
+              {% if application.validada_por %}<p class="application-review__audit">Última validación: {{ application.validada_por.correo }} · {{ application.fecha_validacion|date:"d/m/Y H:i" }}</p>{% endif %}
+            </div>
+          </details>
+        </article>
+      {% empty %}<div class="admin-empty-state"><p>No hay solicitudes registradas.</p></div>{% endfor %}
+    </div>
+  </section>
+{% endblock content %}

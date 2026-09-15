@@ -6,21 +6,44 @@
 {% block content %}
 <!-- PASAMOS AL COMPONENTE EL TITLE Y SUBTITLE -->
 {% include "components/_page_header.html" with title=form_title subtitle=form_subtitle %}
+{{ document_type_catalog|json_script:"document-type-catalog" }}
 
 <section class="admin-create-panel">
-  <form method="post" enctype="multipart/form-data" class="event-config-flex" novalidate>
+  <form method="post" enctype="multipart/form-data" class="event-config-flex"
+    x-data="eventFormWizard({% if form.nombre.errors or form.descripcion.errors or form.imagen.errors or form.visible.errors %}1{% elif form.boletab_eventos.errors %}2{% elif form.catalogo_giros.errors %}3{% elif form.catalogo_folios.errors %}4{% elif form.documentos_adicionales.errors %}5{% else %}1{% endif %}, '{% if form.instance.imagen %}{{ form.instance.imagen.url|escapejs }}{% endif %}')"
+    novalidate>
     {% csrf_token %}
+    <nav class="event-steps event-config-flex__full" aria-label="Pasos para configurar el evento">
+      <template x-for="item in steps" :key="item.number">
+        <button type="button" class="event-step" :class="{ 'is-active': step === item.number, 'is-complete': step > item.number }"
+          @click="goTo(item.number)" :aria-current="step === item.number ? 'step' : null">
+          <span x-text="step > item.number ? '✓' : item.number"></span>
+          <small x-text="item.label"></small>
+        </button>
+      </template>
+    </nav>
     {% if form.non_field_errors %}
     <div class="ui-alert ui-alert--error event-config-flex__full" role="alert">{{ form.non_field_errors.0 }}</div>
     {% endif %}
-    <section class="event-config-card">
+    <section class="event-config-card event-config-card--step" data-step="1" x-show="step === 1" x-cloak>
       <header class="event-config-card__header">
         <span>01</span>
         <div><h2>Datos básicos</h2><p>Define la identidad, imagen y publicación del evento.</p></div>
       </header>
-      {% include "components/_form_field.html" with field=form.nombre %}
-      {% include "components/_form_field.html" with field=form.descripcion %}
-      {% include "components/_form_field.html" with field=form.imagen %}
+      <div class="event-basic-layout">
+        <div class="event-basic-fields">
+          {% include "components/_form_field.html" with field=form.nombre %}
+          {% include "components/_form_field.html" with field=form.descripcion %}
+        </div>
+        <div class="event-image-field">
+          <span class="form-label">Imagen del evento</span>
+          <label class="event-image-preview" for="{{ form.imagen.id_for_label }}">
+            <img x-show="imagePreview" :src="imagePreview" alt="Vista previa de la imagen del evento" />
+            <span x-show="!imagePreview">Selecciona una imagen</span>
+          </label>
+          <div @change="previewImage($event)">{% include "components/_form_field.html" with field=form.imagen %}</div>
+        </div>
+      </div>
       <div class="form-field {% if form.visible.errors %}has-error{% endif %}">
         <label class="form-check-label" for="{{ form.visible.id_for_label }}">
           {{ form.visible }}
@@ -30,7 +53,7 @@
         {% for error in form.visible.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
       </div>
     </section>
-    <section class="event-config-card">
+    <section class="event-config-card event-config-card--step" data-step="2" x-show="step === 2" x-cloak>
       <header class="event-config-card__header">
         <span>02</span>
         <div><h2>Integración con Boletab</h2><p>Relaciona los eventos que proporcionarán secciones y espacios.</p></div>
@@ -39,7 +62,8 @@
       <p id="boletab-events-status" class="form-help" role="status" aria-live="polite"></p>
     </section>
     {{ form.catalogo_giros }}
-    <section class="event-config-card {% if form.catalogo_giros.errors %}has-error{% endif %}">
+    <section class="event-config-card event-config-card--step {% if form.catalogo_giros.errors %}has-error{% endif %}"
+      data-step="3" x-show="step === 3" x-cloak>
       <header class="event-config-card__header">
         <span>03</span>
         <div><h2>Catálogo comercial</h2><p>Define la clasificación disponible para los expositores.</p></div>
@@ -66,7 +90,8 @@
       <div id="giros-editor" class="catalog-list"></div>
       {% for error in form.catalogo_giros.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
     </section>
-    <section class="event-config-card {% if form.catalogo_folios.errors %}has-error{% endif %}"
+    <section class="event-config-card event-config-card--step {% if form.catalogo_folios.errors %}has-error{% endif %}"
+      data-step="4" x-show="step === 4" x-cloak
       x-data="eventFolioCatalog()" x-init="init($refs.catalogInput)"
       x-effect="$refs.catalogInput.value = JSON.stringify(folios)">
       {{ form.catalogo_folios }}
@@ -138,9 +163,117 @@
       </div>
       {% for error in form.catalogo_folios.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
     </section>
+    <section class="event-config-card event-config-card--step {% if form.documentos_adicionales.errors %}has-error{% endif %}"
+      data-step="5" x-show="step === 5" x-cloak x-data="eventDocumentRequirements()"
+      x-init="init($refs.requirementsInput)" x-effect="$refs.requirementsInput.value = JSON.stringify(requirements)">
+      {{ form.documentos_adicionales }}
+      <header class="event-config-card__header">
+        <span>05</span>
+        <div><h2>Documentación adicional</h2><p>Todos los documentos del expediente global se incluyen automáticamente.</p></div>
+      </header>
+      <div class="event-global-documents">
+        <div><strong>Documentos heredados del perfil</strong><p>No necesitas volver a configurarlos para este evento.</p></div>
+        <div class="event-global-documents__list">
+          <template x-for="document in documentCatalog" :key="document.id">
+            <span x-text="document.nombre"></span>
+          </template>
+          <span x-show="!documentCatalog.length">No hay documentos activos en el catálogo global.</span>
+        </div>
+      </div>
+      <div class="catalog-heading">
+        <div>
+          <span class="form-label">Documentos exclusivos del evento</span>
+          <p class="form-help">Agrega únicamente requisitos que no existan en el expediente global.</p>
+        </div>
+        <button type="button" class="btn-outline" @click="addRequirement()">Agregar documento</button>
+      </div>
+      <div class="catalog-list event-document-list">
+        <template x-for="(requirement, index) in requirements" :key="requirement.id">
+          <article class="catalog-card">
+            <div class="catalog-card__head">
+              <h3 x-text="`Documento ${index + 1}`"></h3>
+              <button type="button" class="catalog-remove" @click="requirements.splice(index, 1)">Eliminar</button>
+            </div>
+            <div class="event-document-grid">
+              <label class="catalog-field">
+                <span class="form-label">Nombre del documento</span>
+                <input class="form-input" x-model.trim="requirement.nombre" maxlength="150"
+                  placeholder="Ej. Carta compromiso" required />
+              </label>
+              <label class="catalog-field">
+                <span class="form-label">Tamaño máximo</span>
+                <div class="event-document-size"><input class="form-input" type="number" min="1" max="100"
+                  x-model.number="requirement.max_mb" required /><span>MB</span></div>
+              </label>
+            </div>
+            <div class="event-document-options">
+              <label class="form-check-label"><input class="form-checkbox" type="checkbox" value="PERSONA_FISICA"
+                :checked="requirement.tipos_persona.includes('PERSONA_FISICA')" @change="togglePerson(requirement, 'PERSONA_FISICA', $event.target.checked)" /> Persona física</label>
+              <label class="form-check-label"><input class="form-checkbox" type="checkbox" value="PERSONA_MORAL"
+                :checked="requirement.tipos_persona.includes('PERSONA_MORAL')" @change="togglePerson(requirement, 'PERSONA_MORAL', $event.target.checked)" /> Persona moral</label>
+              <label class="form-check-label"><input class="form-checkbox" type="checkbox"
+                x-model="requirement.obligatorio" /> Obligatorio</label>
+            </div>
+          </article>
+        </template>
+        <div class="catalog-empty" x-show="!requirements.length">
+          <strong>Sin documentación adicional</strong>
+          <p>El evento utilizará únicamente los documentos del expediente global.</p>
+        </div>
+      </div>
+      {% for error in form.documentos_adicionales.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+    </section>
+    
+    <section class="event-config-card event-config-card--step {% if form.equipamiento_obligatorio.errors %}has-error{% endif %}"
+      data-step="6" x-show="step === 6" x-cloak x-data="eventEquipmentRequirements()"
+      x-init="init($refs.equipmentInput)" x-effect="$refs.equipmentInput.value = JSON.stringify(equipment)">
+      {{ form.equipamiento_obligatorio }}
+      <header class="event-config-card__header">
+        <span>06</span>
+        <div><h2>Equipamiento obligatorio</h2><p>Define el equipo obligatorio que los expositores deben registrar para participar.</p></div>
+      </header>
+      
+      <div class="catalog-heading">
+        <div>
+          <span class="form-label">Equipos requeridos</span>
+          <p class="form-help">Añade equipos como sillas, mesas, botes de basura o extintores.</p>
+        </div>
+        <button type="button" class="btn-outline" @click="addEquipment()">Agregar equipo</button>
+      </div>
+      <div class="catalog-list event-document-list">
+        <template x-for="(eq, index) in equipment" :key="index">
+          <article class="catalog-card">
+            <div class="catalog-card__head">
+              <h3 x-text="`Equipo ${index + 1}`"></h3>
+              <button type="button" class="catalog-remove" @click="equipment.splice(index, 1)">Eliminar</button>
+            </div>
+            <div class="event-document-grid">
+              <label class="catalog-field">
+                <span class="form-label">Nombre del equipo</span>
+                <input class="form-input" x-model.trim="eq.nombre" maxlength="150"
+                  placeholder="Ej. Botes de basura" required />
+              </label>
+            </div>
+            <div class="event-document-options">
+              <label class="form-check-label"><input class="form-checkbox" type="checkbox"
+                x-model="eq.pedir_foto" /> Pedir foto obligatoria</label>
+            </div>
+          </article>
+        </template>
+        <div class="catalog-empty" x-show="!equipment.length">
+          <strong>Sin equipamiento obligatorio</strong>
+          <p>No se solicitará ningún equipo adicional.</p>
+        </div>
+      </div>
+      {% for error in form.equipamiento_obligatorio.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+    </section>
     <div class="form-actions form-actions--split event-config-flex__full event-config-actions">
       <a href="{% url 'autenticacion:admin_events' %}" class="btn-outline btn-lg">Cancelar</a>
-      <button type="submit" class="btn-primary btn-lg">{{ submit_label }}</button>
+      <div class="event-config-actions__navigation">
+        <button type="button" class="btn-outline btn-lg" x-show="step > 1" @click="previous()">Anterior</button>
+        <button type="button" class="btn-primary btn-lg" x-show="step < steps.length" @click="next()">Continuar</button>
+        <button type="submit" class="btn-primary btn-lg" x-show="step === steps.length">{{ submit_label }}</button>
+      </div>
     </div>
   </form>
 </section>
@@ -150,6 +283,99 @@
 {{ selected_boletab_event_ids|json_script:"selected-boletab-events" }}
 <script>
   document.addEventListener('alpine:init', () => {
+    Alpine.data('eventFormWizard', (initialStep, initialImage) => ({
+      step: initialStep,
+      highestStep: initialStep,
+      imagePreview: initialImage || '',
+      steps: [
+        { number: 1, label: 'Datos básicos' },
+        { number: 2, label: 'Boletab' },
+        { number: 3, label: 'Catálogo' },
+        { number: 4, label: 'Folios' },
+        { number: 5, label: 'Documentos' },
+        { number: 6, label: 'Equipamiento' }
+      ],
+      previewImage(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (this.imagePreview.startsWith('blob:')) URL.revokeObjectURL(this.imagePreview);
+        this.imagePreview = URL.createObjectURL(file);
+      },
+      validateCurrentStep() {
+        const panel = this.$root.querySelector(`[data-step="${this.step}"]`);
+        const invalid = [...panel.querySelectorAll('input, select, textarea')]
+          .find(field => !field.disabled && field.type !== 'hidden' && !field.checkValidity());
+        if (invalid) {
+          invalid.reportValidity();
+          invalid.focus();
+          return false;
+        }
+        return true;
+      },
+      next() {
+        if (!this.validateCurrentStep()) return;
+        this.step = Math.min(this.steps.length, this.step + 1);
+        this.highestStep = Math.max(this.highestStep, this.step);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+      previous() {
+        this.step = Math.max(1, this.step - 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+      goTo(target) {
+        if (target <= this.highestStep || target <= this.step) {
+          this.step = target;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    }));
+
+    Alpine.data('eventDocumentRequirements', () => ({
+      requirements: [],
+      documentCatalog: JSON.parse(document.getElementById('document-type-catalog').textContent),
+      init(input) {
+        try {
+          const value = JSON.parse(input.value || '[]');
+          this.requirements = Array.isArray(value) ? value
+            .filter(item => item.origen !== 'CATALOGO')
+            .map(item => ({
+            ...item,
+            tipos_persona: Array.isArray(item.tipos_persona) ? item.tipos_persona : [],
+            obligatorio: item.obligatorio !== false,
+            max_mb: Number(item.max_mb) || 10
+            })) : [];
+        } catch (_) { this.requirements = []; }
+      },
+      addRequirement() {
+        this.requirements.push({
+          id: crypto.randomUUID(), origen: 'PERSONALIZADO', tipo_documento_id: null, nombre: '',
+          tipos_persona: ['PERSONA_FISICA', 'PERSONA_MORAL'], obligatorio: true, max_mb: 10
+        });
+      },
+      togglePerson(requirement, type, checked) {
+        requirement.tipos_persona = checked
+          ? [...new Set([...requirement.tipos_persona, type])]
+          : requirement.tipos_persona.filter(value => value !== type);
+      }
+    }));
+
+    Alpine.data('eventEquipmentRequirements', () => ({
+      equipment: [],
+      init(inputElement) {
+        if (inputElement.value) {
+          try {
+            const parsed = JSON.parse(inputElement.value);
+            this.equipment = Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            this.equipment = [];
+          }
+        }
+      },
+      addEquipment() {
+        this.equipment.push({ nombre: '', pedir_foto: false });
+      }
+    }));
+
     Alpine.data('giroCatalogImporter', () => ({
       message: '',
       error: '',
@@ -360,6 +586,7 @@
     } finally {
       select.disabled = false;
     }
+
   });
 </script>
 {% endblock extra_js %}

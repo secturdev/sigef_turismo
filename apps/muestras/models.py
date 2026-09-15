@@ -25,6 +25,12 @@ def _ruta_foto_equipamiento(instance, filename: str) -> str:
 
 
 class SolicitudMuestra(models.Model):
+    class Estado(models.TextChoices):
+        BORRADOR = "BORRADOR", "Borrador"
+        EN_REVISION = "EN_REVISION", "En revisión"
+        APROBADA = "APROBADA", "Aprobada"
+        RECHAZADA = "RECHAZADA", "Rechazada"
+
     usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -63,6 +69,16 @@ class SolicitudMuestra(models.Model):
         "expediente.Mobiliario", blank=True, related_name="solicitudes_muestra"
     )
     paso_actual = models.PositiveSmallIntegerField("paso actual", default=1)
+    estado = models.CharField(
+        "estado", max_length=20, choices=Estado.choices, default=Estado.BORRADOR
+    )
+    observaciones_validacion = models.TextField("observaciones de validación", blank=True)
+    validada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="solicitudes_validadas", verbose_name="validada por",
+    )
+    fecha_envio = models.DateTimeField("fecha de envío", null=True, blank=True)
+    fecha_validacion = models.DateTimeField("fecha de validación", null=True, blank=True)
     cantidad_botes_basura = models.PositiveIntegerField("cantidad de botes de basura", default=0)
     cantidad_extintores = models.PositiveIntegerField("cantidad de extintores", default=0)
     modelo_botes_basura = models.CharField("modelo o nombre del bote de basura", max_length=150, blank=True)
@@ -89,8 +105,7 @@ class SolicitudMuestra(models.Model):
             self.nombre_comercio
             and self.giro
             and self.subgiro
-            and self.programa_especial
-            and (self.programa_especial == "NINGUNO" or self.folio_programa_social)
+            and (not self.programa_especial or self.programa_especial == "NINGUNO" or self.folio_programa_social)
             and self.producto_principal_id
             and self.productos.exists()
         )
@@ -143,3 +158,19 @@ class MobiliarioSolicitud(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["solicitud", "mobiliario"], name="mobiliario_unico_por_solicitud")]
+
+
+class EquipamientoAdicionalSolicitud(models.Model):
+    solicitud = models.ForeignKey(
+        SolicitudMuestra, on_delete=models.CASCADE, related_name='detalle_equipamiento_adicional'
+    )
+    nombre_equipo = models.CharField('nombre de equipo', max_length=150)
+    cantidad = models.PositiveIntegerField('cantidad', default=1)
+    modelo = models.CharField('modelo', max_length=150, blank=True)
+    foto = models.FileField(
+        'foto', upload_to=_ruta_foto_equipamiento, blank=True
+    )
+
+    class Meta:
+        verbose_name = 'equipamiento adicional'
+        verbose_name_plural = 'equipamientos adicionales'

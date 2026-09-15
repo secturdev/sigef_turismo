@@ -51,7 +51,9 @@ def available_spaces_for_application(
     valid_folio = folio in event_folios if uses_folio else None
     access_type = "FOLIO" if uses_folio else "GIRO_SUBGIRO"
 
-    rules: Iterable[ReglaEspacio] = event.reglas_espacios.all()
+    rules: Iterable[ReglaEspacio] = event.reglas_espacios.filter(
+        estado_plantilla=ReglaEspacio.EstadoPlantilla.VIGENTE
+    )
     all_rules = list(rules)
     if uses_folio and valid_folio:
         allowed_rules = [rule for rule in all_rules if _matches_folio(rule, folio)]

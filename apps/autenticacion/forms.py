@@ -8,6 +8,7 @@ from django.contrib.auth.password_validation import validate_password
 
 from .models import Usuario
 from apps.landingpage.models import Evento
+from apps.expediente.models import TipoDocumento
 from apps.muestras.constants import GIROS, SUBGIROS, SUBGIROS_POR_GIRO
 
 
@@ -63,6 +64,12 @@ class AdminLoginForm(forms.Form):
 
 
 class AdminCreateForm(forms.ModelForm):
+    role = forms.ChoiceField(
+        label="Rol de acceso",
+        choices=(("ADMIN", "Administrador"), ("VALIDATOR", "Validador")),
+        initial="ADMIN",
+        required=False,
+    )
     password = forms.CharField(
         label="Contraseña",
         strip=False,
@@ -105,11 +112,82 @@ class AdminCreateForm(forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.is_staff = True
+        user.is_validator = self.cleaned_data.get("role") == "VALIDATOR"
         user.is_active = True
         user.set_password(self.cleaned_data["password"])
         if commit:
             user.save()
         return user
+
+
+class AdminUserUpdateForm(forms.ModelForm):
+    role = forms.ChoiceField(
+        label="Rol de acceso",
+        choices=(("EXHIBITOR", "Expositor"), ("ADMIN", "Administrador"), ("VALIDATOR", "Validador")),
+    )
+
+    class Meta:
+        model = Usuario
+        fields = ("nombre_visible", "correo", "is_active")
+        labels = {
+            "nombre_visible": "Nombre",
+            "is_active": "Usuario activo",
+        }
+        widgets = {
+            "nombre_visible": forms.TextInput(attrs={"autocomplete": "name"}),
+            "correo": forms.EmailInput(attrs={"autocomplete": "email"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.is_validator:
+            self.initial["role"] = "VALIDATOR"
+        elif self.instance.is_staff:
+            self.initial["role"] = "ADMIN"
+        else:
+            self.initial["role"] = "EXHIBITOR"
+        for field in self.fields.values():
+            field.widget.attrs.setdefault("class", "form-input")
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        role = self.cleaned_data["role"]
+        user.is_staff = role in {"ADMIN", "VALIDATOR"}
+        user.is_validator = role == "VALIDATOR"
+        if commit:
+            user.save()
+        return user
+
+
+class AdminPasswordResetForm(forms.Form):
+    password = forms.CharField(
+        label="Nueva contraseña",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    password_confirmation = forms.CharField(
+        label="Confirmar contraseña",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "form-input"
+
+    def clean_password(self):
+        password = self.cleaned_data["password"]
+        validate_password(password, self.user)
+        return password
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("password") and cleaned.get("password_confirmation"):
+            if cleaned["password"] != cleaned["password_confirmation"]:
+                self.add_error("password_confirmation", "Las contraseñas no coinciden.")
+        return cleaned
 
 
 class EventCreateForm(forms.ModelForm):
@@ -120,6 +198,8 @@ class EventCreateForm(forms.ModelForm):
     )
     catalogo_giros = forms.CharField(required=False, widget=forms.HiddenInput)
     catalogo_folios = forms.CharField(required=False, widget=forms.HiddenInput)
+    documentos_adicionales = forms.CharField(required=False, widget=forms.HiddenInput)
+    equipamiento_obligatorio = forms.CharField(required=False, widget=forms.HiddenInput)
 
     class Meta:
         model = Evento
@@ -127,6 +207,8 @@ class EventCreateForm(forms.ModelForm):
             "boletab_eventos",
             "catalogo_giros",
             "catalogo_folios",
+            "documentos_adicionales",
+            "equipamiento_obligatorio",
             "nombre",
             "descripcion",
             "imagen",
@@ -160,11 +242,18 @@ class EventCreateForm(forms.ModelForm):
             self.initial["catalogo_folios"] = json.dumps(
                 self.instance.catalogo_folios, ensure_ascii=False
             )
+            self.initial["documentos_adicionales"] = json.dumps(
+                self.instance.documentos_adicionales, ensure_ascii=False
+            )
+            self.initial["equipamiento_obligatorio"] = json.dumps(
+                self.instance.equipamiento_obligatorio, ensure_ascii=False
+            )
         for name, field in self.fields.items():
             field.widget.attrs["class"] = (
                 "form-checkbox" if name == "visible" else "form-input"
             )
         self.fields["catalogo_folios"].widget.attrs["x-ref"] = "catalogInput"
+        self.fields["documentos_adicionales"].widget.attrs["x-ref"] = "requirementsInput"
 
     def clean_imagen(self):
         imagen = self.cleaned_data["imagen"]
@@ -236,11 +325,90 @@ class EventCreateForm(forms.ModelForm):
         ]
         event.catalogo_giros = self.cleaned_data["catalogo_giros"]
         event.catalogo_folios = self.cleaned_data["catalogo_folios"]
+        event.documentos_adicionales = self.cleaned_data["documentos_adicionales"]
+        event.equipamiento_obligatorio = self.cleaned_data.get("equipamiento_obligatorio", [])
         event.giros_disponibles = [giro["id"] for giro in event.catalogo_giros]
         event.subgiros_disponibles = [subgiro["id"] for giro in event.catalogo_giros for subgiro in giro["subgiros"]]
         if commit:
             event.save()
         return event
+
+    def clean_documentos_adicionales(self):
+        raw = self.cleaned_data.get("documentos_adicionales") or "[]"
+        try:
+            requirements = json.loads(raw)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise forms.ValidationError("La configuración de documentos no es válida.") from exc
+        if not isinstance(requirements, list):
+            raise forms.ValidationError("La configuración de documentos no es válida.")
+
+        global_names = {
+            self._key(name)
+            for name in TipoDocumento.objects.filter(activo=True).values_list("nombre", flat=True)
+        }
+        cleaned = []
+        for index, item in enumerate(requirements, start=1):
+            if not isinstance(item, dict):
+                raise forms.ValidationError(f"El documento {index} no es válido.")
+            source = str(item.get("origen") or "PERSONALIZADO").upper()
+            # Las referencias antiguas al catálogo ya se heredan automáticamente.
+            if source == "CATALOGO":
+                continue
+            name = str(item.get("nombre") or "").strip()
+            if source != "PERSONALIZADO":
+                raise forms.ValidationError(f"El origen del documento {index} no es válido.")
+            if not name:
+                raise forms.ValidationError(f"Escribe el nombre del documento adicional {index}.")
+            if self._key(name) in global_names:
+                raise forms.ValidationError(
+                    f'"{name}" ya pertenece al expediente global y no necesitas agregarlo al evento.'
+                )
+
+            applies_to = list(dict.fromkeys(
+                value for value in item.get("tipos_persona", [])
+                if value in {"PERSONA_FISICA", "PERSONA_MORAL"}
+            ))
+            if not applies_to:
+                raise forms.ValidationError(f"Selecciona al menos un tipo de persona para {name}.")
+            try:
+                max_mb = int(item.get("max_mb", 10))
+            except (TypeError, ValueError) as exc:
+                raise forms.ValidationError(f"El límite de carga de {name} no es válido.") from exc
+            if not 1 <= max_mb <= 100:
+                raise forms.ValidationError(f"El límite de {name} debe estar entre 1 y 100 MB.")
+            cleaned.append({
+                "id": str(item.get("id") or f"documento-{index}"),
+                "origen": "PERSONALIZADO",
+                "tipo_documento_id": None,
+                "nombre": name,
+                "tipos_persona": applies_to,
+                "obligatorio": bool(item.get("obligatorio", True)),
+                "max_mb": max_mb,
+            })
+        return cleaned
+
+
+    def clean_equipamiento_obligatorio(self):
+        raw = self.cleaned_data.get("equipamiento_obligatorio") or "[]"
+        try:
+            equipment = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            raise forms.ValidationError("La configuración de equipamiento no es válida.")
+        if not isinstance(equipment, list):
+            raise forms.ValidationError("La configuración de equipamiento no es válida.")
+        
+        cleaned = []
+        for index, item in enumerate(equipment, start=1):
+            if not isinstance(item, dict):
+                raise forms.ValidationError(f"El equipo {index} no es válido.")
+            nombre = str(item.get("nombre") or "").strip()
+            if not nombre:
+                raise forms.ValidationError(f"Escribe el nombre del equipo {index}.")
+            cleaned.append({
+                "nombre": nombre,
+                "pedir_foto": bool(item.get("pedir_foto", False))
+            })
+        return cleaned
 
     def clean_catalogo_folios(self):
         raw = self.cleaned_data.get("catalogo_folios") or "[]"
@@ -368,8 +536,8 @@ class SectionRuleForm(forms.Form):
             rules = json.loads(self.cleaned_data["reglas_json"])
         except (TypeError, json.JSONDecodeError) as exc:
             raise forms.ValidationError("Las capacidades de la sección no son válidas.") from exc
-        if not isinstance(rules, list) or not rules:
-            raise forms.ValidationError("Agrega al menos una capacidad a la sección.")
+        if not isinstance(rules, list):
+            raise forms.ValidationError("Las capacidades de la sección no son válidas.")
 
         valid_giros = {item["id"]: item for item in self.catalog}
         cleaned, combinations = [], set()

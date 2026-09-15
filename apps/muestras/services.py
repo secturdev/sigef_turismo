@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
-from .models import ImagenComercio, MobiliarioSolicitud, ProductoSolicitud, SolicitudMuestra
+from .models import ImagenComercio, MobiliarioSolicitud, ProductoSolicitud, SolicitudMuestra, EquipamientoAdicionalSolicitud
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -33,6 +34,7 @@ def guardar_paso1(
     nombre_comercio: str,
     productos: list[dict],
     mobiliario: list[dict],
+    equipos_dinamicos: list[dict] = None,
 ) -> SolicitudMuestra:
     solicitud.nombre_comercio = (nombre_comercio or "").strip()
     solicitud.giro = data.get("giro") or ""
@@ -46,20 +48,11 @@ def guardar_paso1(
         (row["item"] for row in productos if str(row["item"].pk) == str(data.get("producto_principal"))),
         None,
     )
-    solicitud.cantidad_botes_basura = data.get("cantidad_botes_basura") or 0
-    solicitud.cantidad_extintores = data.get("cantidad_extintores") or 0
-    solicitud.modelo_botes_basura = (data.get("modelo_botes_basura") or "").strip()
-    solicitud.modelo_extintores = (data.get("modelo_extintores") or "").strip()
-    if data.get("foto_botes_basura"):
-        solicitud.foto_botes_basura = data["foto_botes_basura"]
-    if data.get("foto_extintores"):
-        solicitud.foto_extintores = data["foto_extintores"]
+    pass
     if not solicitud.nombre_comercio:
         raise ValidationError({"nombre_comercio": "El nombre de comercio es obligatorio."})
     if not solicitud.giro:
         raise ValidationError({"giro": "Selecciona un giro."})
-    if not solicitud.programa_especial:
-        raise ValidationError({"programa_especial": "Selecciona un programa especial."})
     if not productos:
         raise ValidationError({"productos": "Selecciona al menos un producto."})
     solicitud.paso_actual = max(solicitud.paso_actual, 2)
@@ -82,6 +75,18 @@ def guardar_paso1(
         MobiliarioSolicitud.objects.update_or_create(
             solicitud=solicitud, mobiliario=row["item"], defaults=defaults
         )
+    
+    if equipos_dinamicos is not None:
+        nombres_equipos = [eq["nombre_equipo"] for eq in equipos_dinamicos]
+        solicitud.detalle_equipamiento_adicional.exclude(nombre_equipo__in=nombres_equipos).delete()
+        for eq in equipos_dinamicos:
+            defaults = {"cantidad": eq["cantidad"], "modelo": eq["modelo"]}
+            if eq.get("foto"):
+                defaults["foto"] = eq["foto"]
+            EquipamientoAdicionalSolicitud.objects.update_or_create(
+                solicitud=solicitud, nombre_equipo=eq["nombre_equipo"], defaults=defaults
+            )
+            
     return solicitud
 
 
@@ -118,5 +123,13 @@ def guardar_paso2(
         raise ValidationError({"imagenes": "Sube al menos una imagen del comercio."})
 
     solicitud.paso_actual = max(solicitud.paso_actual, 3)
-    solicitud.save(update_fields=["paso_actual", "fecha_actualizacion"])
+    solicitud.estado = SolicitudMuestra.Estado.EN_REVISION
+    solicitud.fecha_envio = timezone.now()
+    solicitud.observaciones_validacion = ""
+    solicitud.validada_por = None
+    solicitud.fecha_validacion = None
+    solicitud.save(update_fields=[
+        "paso_actual", "estado", "fecha_envio", "observaciones_validacion",
+        "validada_por", "fecha_validacion", "fecha_actualizacion",
+    ])
     return solicitud

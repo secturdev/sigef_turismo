@@ -17,26 +17,31 @@
       </svg>
       Inicio
     </a>
-    <a href="{% url 'autenticacion:admin_users' %}"
+    {% if request.user.is_superuser %}<a href="{% url 'autenticacion:admin_users' %}"
        class="app-nav-link {% if nav_active == 'admin_users' %}is-active{% endif %}">
       <svg class="h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m1.5-1.5h-3m-6-3.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM2.25 20.25a6 6 0 0 1 12 0v.75h-12v-.75Z" />
       </svg>
-      Usuarios administradores
-    </a>
-    <a href="{% url 'autenticacion:admin_events' %}"
+      Usuarios
+    </a>{% endif %}
+    {% if request.user.is_validator or request.user.is_superuser %}<a href="{% url 'autenticacion:admin_applications' %}"
+       class="app-nav-link {% if nav_active == 'admin_applications' %}is-active{% endif %}">
+      <svg class="h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m6-3.375c0 7.5-4.5 12-9 13.5-4.5-1.5-9-6-9-13.5A12.3 12.3 0 0 0 12 3c3.183 0 6.088 1.205 9 3.375Z" /></svg>
+      Solicitudes
+    </a>{% endif %}
+    {% if not request.user.is_validator %}<a href="{% url 'autenticacion:admin_events' %}"
        class="app-nav-link {% if nav_active == 'admin_events' %}is-active{% endif %}">
       <svg class="h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 9.75h16.5m-15.75-4.5h15A2.25 2.25 0 0 1 21.75 7.5v11.25A2.25 2.25 0 0 1 19.5 21h-15a2.25 2.25 0 0 1-2.25-2.25V7.5A2.25 2.25 0 0 1 4.5 5.25Z" />
       </svg>
       Eventos
-    </a>
+    </a>{% endif %}
   </nav>
 
   <div class="app-sidebar__footer">
     <p class="app-sidebar__user">{{ request.user.correo }}</p>
     <p class="app-sidebar__role">
-      {% if request.user.is_superuser %}Superadministrador{% else %}Administrador{% endif %}
+      {% if request.user.is_superuser %}Superadministrador{% elif request.user.is_validator %}Validador{% else %}Administrador{% endif %}
     </p>
     <form method="post" action="{% url 'autenticacion:admin_logout' %}">
       {% csrf_token %}

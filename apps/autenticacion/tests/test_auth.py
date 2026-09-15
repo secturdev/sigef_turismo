@@ -7,7 +7,7 @@ from django.urls import NoReverseMatch, reverse
 from apps.autenticacion.models import Usuario
 from apps.autenticacion.forms import SpaceRuleForm
 from apps.autenticacion.oidc import LlaveTabascoOIDCBackend, _log_oidc_claims
-from apps.expediente.models import DatosGenerales
+from apps.expediente.models import DatosGenerales, TipoDocumento
 from apps.landingpage.models import Evento, ReglaEspacio, ReglaSeccion
 from apps.landingpage.boletab import BoletabError
 from apps.muestras.models import SolicitudMuestra
@@ -60,7 +60,7 @@ class AuthTests(TestCase):
             nombre="Evento API",
             descripcion="Descripción",
             imagen="eventos/existing.png",
-            boletab_eventos=[{"id": "61", "name": "Evento Boletab"}],
+            boletab_eventos=[{"id": 61, "name": "Evento Boletab"}],
             catalogo_folios=[
                 {"codigo": "SOCIAL-001", "tipo": "PROGRAMA_SOCIAL"}
             ],
@@ -161,7 +161,7 @@ class AuthTests(TestCase):
         self.client.force_login(admin)
 
         response = self.client.post(
-            reverse("autenticacion:admin_users"),
+            reverse("autenticacion:admin_user_create"),
             {
                 "nombre_visible": "Nueva Administradora",
                 "correo": "new-admin@example.com",
@@ -176,6 +176,41 @@ class AuthTests(TestCase):
         self.assertTrue(created.is_active)
         self.assertFalse(created.is_superuser)
         self.assertTrue(created.check_password("SafeTemporary2026!"))
+
+    def test_superadmin_can_create_validator_from_user_form(self):
+        owner = Usuario.objects.create_superuser(
+            correo="owner-validator@example.com", password="TemporaryOwner01"
+        )
+        self.client.force_login(owner)
+
+        response = self.client.post(
+            reverse("autenticacion:admin_user_create"),
+            {
+                "nombre_visible": "Validadora",
+                "correo": "new-validator@example.com",
+                "role": "VALIDATOR",
+                "password": "SafeTemporary2026!",
+                "password_confirmation": "SafeTemporary2026!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("autenticacion:admin_users"))
+        created = Usuario.objects.get(correo="new-validator@example.com")
+        self.assertTrue(created.is_staff)
+        self.assertTrue(created.is_validator)
+        self.assertFalse(created.is_superuser)
+
+    def test_user_management_uses_alpine_paginated_table(self):
+        owner = Usuario.objects.create_superuser(
+            correo="owner-table@example.com", password="TemporaryOwner01"
+        )
+        self.client.force_login(owner)
+
+        response = self.client.get(reverse("autenticacion:admin_users"))
+
+        self.assertContains(response, "userTable(")
+        self.assertContains(response, "admin-users-table")
+        self.assertContains(response, "Página")
 
     def test_sidebar_displays_the_admin_role(self):
         admin = Usuario.objects.create_superuser(
@@ -197,6 +232,50 @@ class AuthTests(TestCase):
         response = self.client.get(reverse("autenticacion:admin_users"))
 
         self.assertEqual(response.status_code, 403)
+
+    def test_non_super_admin_cannot_manage_users(self):
+        admin = Usuario.objects.create_user(
+            correo="limited-admin@example.com",
+            password="SafeTemporary2026!",
+            is_staff=True,
+        )
+        self.client.force_login(admin)
+        response = self.client.get(reverse("autenticacion:admin_users"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_superadmin_can_list_promote_and_reset_admin_password(self):
+        owner = Usuario.objects.create_superuser(
+            correo="owner-users@example.com", password="TemporaryOwner01"
+        )
+        exhibitor = Usuario.objects.create_user(
+            correo="exhibitor-list@example.com", password="SafeTemporary2026!"
+        )
+        self.client.force_login(owner)
+
+        page = self.client.get(reverse("autenticacion:admin_users"))
+        self.assertContains(page, exhibitor.correo)
+        self.assertContains(page, "Expositor")
+
+        promote = self.client.post(
+            reverse("autenticacion:admin_users"),
+            {"action": "promote_admin", "user_id": exhibitor.pk},
+        )
+        self.assertRedirects(promote, reverse("autenticacion:admin_users"))
+        exhibitor.refresh_from_db()
+        self.assertTrue(exhibitor.is_staff)
+
+        reset = self.client.post(
+            reverse("autenticacion:admin_users"),
+            {
+                "action": "reset_password",
+                "user_id": exhibitor.pk,
+                "password": "NewSafePassword2026!",
+                "password_confirmation": "NewSafePassword2026!",
+            },
+        )
+        self.assertRedirects(reset, reverse("autenticacion:admin_users"))
+        exhibitor.refresh_from_db()
+        self.assertTrue(exhibitor.check_password("NewSafePassword2026!"))
 
     def test_admin_can_create_visible_event(self):
         admin = Usuario.objects.create_superuser(
@@ -301,6 +380,19 @@ class AuthTests(TestCase):
             {"codigo": " social-2026-001 ", "tipo": "programa_social"},
             {"codigo": "PATROCINADOR-01", "tipo": "PATROCINADOR"},
         ]
+        document_type = TipoDocumento.objects.create(
+            clave="constancia-fiscal", nombre="Constancia de situación fiscal"
+        )
+        requirements = [
+            {
+                "id": "carta",
+                "origen": "PERSONALIZADO",
+                "nombre": "Carta compromiso del evento",
+                "tipos_persona": ["PERSONA_FISICA", "PERSONA_MORAL"],
+                "obligatorio": True,
+                "max_mb": 5,
+            },
+        ]
         with (
             tempfile.TemporaryDirectory() as media_root,
             override_settings(MEDIA_ROOT=media_root),
@@ -309,6 +401,7 @@ class AuthTests(TestCase):
             response = self.client.post(reverse("autenticacion:admin_event_create"), {
                 "boletab_eventos": ["81"], "catalogo_giros": json.dumps(catalog),
                 "catalogo_folios": json.dumps(folios),
+                "documentos_adicionales": json.dumps(requirements),
                 "nombre": "Evento con catálogo", "descripcion": "Descripción", "imagen": image,
             })
         self.assertRedirects(response, reverse("autenticacion:admin_events"))
@@ -321,6 +414,26 @@ class AuthTests(TestCase):
                 {"codigo": "SOCIAL-2026-001", "tipo": "PROGRAMA_SOCIAL"},
                 {"codigo": "PATROCINADOR-01", "tipo": "PATROCINADOR"},
             ],
+        )
+        self.assertEqual(len(event.documentos_adicionales), 1)
+        self.assertEqual(event.documentos_adicionales[0]["max_mb"], 5)
+        self.assertEqual(
+            event.documentos_adicionales[0]["tipos_persona"],
+            ["PERSONA_FISICA", "PERSONA_MORAL"],
+        )
+        required_for_moral = event.documentos_requeridos("PERSONA_MORAL")
+        self.assertTrue(any(
+            item["tipo_documento_id"] == document_type.pk
+            and item["origen"] == "GLOBAL"
+            for item in required_for_moral
+        ))
+        self.assertEqual(required_for_moral[-1]["origen"], "PERSONALIZADO")
+        edit_page = self.client.get(
+            reverse("autenticacion:admin_event_update", args=[event.pk])
+        )
+        self.assertIn(
+            document_type.nombre,
+            [item["nombre"] for item in edit_page.context["document_type_catalog"]],
         )
 
     def test_admin_can_fetch_boletab_events_as_json(self):
@@ -471,12 +584,86 @@ class AuthTests(TestCase):
             reverse("autenticacion:admin_event_update", args=[event.pk]),
         )
 
+    def test_space_rules_are_reconciled_when_boletab_template_changes(self):
+        admin = Usuario.objects.create_superuser(
+            correo="template-change@example.com", password="TemporaryOwner01"
+        )
+        event = Evento.objects.create(
+            boletab_eventos=[{"id": "61", "name": "Evento Boletab"}],
+            nombre="Evento modificado",
+            descripcion="Descripción",
+            imagen="eventos/existing.png",
+        )
+        missing_rule = ReglaEspacio.objects.create(
+            evento=event,
+            boletab_evento_id="61",
+            asiento_id="100",
+            etiqueta="Stand eliminado",
+            boletab_seccion_id="10",
+            folios=["SOCIAL-001"],
+        )
+        moved_rule = ReglaEspacio.objects.create(
+            evento=event,
+            boletab_evento_id="61",
+            asiento_id="200",
+            etiqueta="Stand movido",
+            boletab_seccion_id="10",
+            folios=["SOCIAL-001"],
+        )
+        valid_rule = ReglaEspacio.objects.create(
+            evento=event,
+            boletab_evento_id="61",
+            asiento_id="300",
+            etiqueta="Stand vigente",
+            boletab_seccion_id="20",
+            folios=["SOCIAL-001"],
+        )
+        current_places = [
+            {
+                "asientoId": 200,
+                "seccionId": 20,
+                "etiqueta": "Stand movido",
+                "coordinates": [(0, 0), (10, 0), (10, 10)],
+            },
+            {
+                "asientoId": 300,
+                "seccionId": 20,
+                "etiqueta": "Stand vigente",
+                "coordinates": [(20, 0), (30, 0), (30, 10)],
+            },
+        ]
+        self.client.force_login(admin)
+
+        with patch(
+            "apps.autenticacion.views.get_boletab_places",
+            return_value=current_places,
+        ):
+            response = self.client.get(
+                reverse("autenticacion:admin_event_spaces_data", args=[event.pk]),
+                {"evento": "61"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        warnings = response.json()["template_warnings"]
+        self.assertEqual({item["asiento_id"] for item in warnings}, {"100", "200"})
+        missing_rule.refresh_from_db()
+        moved_rule.refresh_from_db()
+        valid_rule.refresh_from_db()
+        self.assertEqual(missing_rule.estado_plantilla, "AUSENTE")
+        self.assertEqual(moved_rule.estado_plantilla, "MODIFICADO")
+        self.assertEqual(valid_rule.estado_plantilla, "VIGENTE")
+        places_by_id = {
+            str(item["asientoId"]): item for item in response.json()["places"]
+        }
+        self.assertFalse(places_by_id["200"]["rules"]["configured"])
+        self.assertTrue(places_by_id["300"]["rules"]["configured"])
+
     def test_admin_can_fetch_sections_for_linked_boletab_event(self):
         admin = Usuario.objects.create_superuser(
             correo="sections@example.com", password="TemporaryOwner01"
         )
         event = Evento.objects.create(
-            boletab_eventos=[{"id": "61", "name": "Evento Boletab"}],
+            boletab_eventos=[{"id": 61, "name": "Evento Boletab"}],
             catalogo_giros=[{
                 "id": "ARTESANIAS",
                 "nombre": "Artesanías",
@@ -588,12 +775,36 @@ class AuthTests(TestCase):
             ReglaEspacio.objects.filter(evento=event, asiento_id="4").exists()
         )
 
+        with (
+            patch(
+                "apps.autenticacion.views.get_boletab_sections",
+                return_value=[{"id": 376, "nombre": "Chocolaterías y Bebidas"}],
+            ),
+            patch(
+                "apps.autenticacion.views.get_boletab_places",
+                return_value=[{"asientoId": value} for value in range(1, 11)],
+            ),
+        ):
+            clear_section_response = self.client.post(
+                reverse("autenticacion:admin_event_sections_data", args=[event.pk]),
+                {
+                    "boletab_evento_id": "61",
+                    "seccion_id": "376",
+                    "reglas_json": "[]",
+                },
+            )
+        self.assertEqual(clear_section_response.status_code, 200)
+        self.assertEqual(clear_section_response.json()["rules"], [])
+        self.assertFalse(
+            ReglaSeccion.objects.filter(evento=event, seccion_id="376").exists()
+        )
+
     def test_admin_can_save_eligibility_rules_for_space(self):
         admin = Usuario.objects.create_superuser(
             correo="rules@example.com", password="TemporaryOwner01"
         )
         event = Evento.objects.create(
-            boletab_eventos=[{"id": "61", "name": "Evento Boletab"}],
+            boletab_eventos=[{"id": 61, "name": "Evento Boletab"}],
             catalogo_folios=[
                 {"codigo": "FOLIO-01", "tipo": "PROGRAMA_SOCIAL"},
                 {"codigo": "FOLIO-02", "tipo": "PROGRAMA_SOCIAL"},
@@ -652,6 +863,18 @@ class AuthTests(TestCase):
         second_rule = ReglaEspacio.objects.get(evento=event, asiento_id="59350")
         self.assertEqual(second_rule.reglas, rule.reglas)
         self.assertEqual(second_rule.folios, rule.folios)
+
+        with patch(
+            "apps.autenticacion.views.get_boletab_places", return_value=places
+        ):
+            reload_response = self.client.get(
+                reverse("autenticacion:admin_event_spaces_data", args=[event.pk]),
+                {"evento": "61"},
+            )
+        self.assertEqual(reload_response.status_code, 200)
+        reloaded_places = reload_response.json()["places"]
+        self.assertEqual(reloaded_places[0]["rules"]["reglas"], rule.reglas)
+        self.assertTrue(reloaded_places[0]["rules"]["configured"])
 
         clear_response = self.client.post(
             reverse("autenticacion:admin_event_spaces", args=[event.pk]),
@@ -793,3 +1016,66 @@ class AuthTests(TestCase):
         user.refresh_from_db()
         self.assertEqual(user.correo, claims["email"])
         self.assertEqual(user.nombre_visible, claims["name"])
+
+    def test_validator_can_review_but_cannot_manage_events(self):
+        validator = Usuario.objects.create_user(
+            correo="validator@example.com",
+            password="TemporaryValidator01",
+            is_staff=True,
+            is_validator=True,
+        )
+        applicant = Usuario.objects.create_user(correo="applicant-review@example.com")
+        SolicitudMuestra.objects.create(
+            usuario=applicant,
+            nombre_comercio="Comercio a validar",
+            estado=SolicitudMuestra.Estado.EN_REVISION,
+        )
+        self.client.force_login(validator)
+
+        inbox = self.client.get(reverse("autenticacion:admin_applications"))
+        events = self.client.get(reverse("autenticacion:admin_events"))
+
+        self.assertEqual(inbox.status_code, 200)
+        self.assertContains(inbox, "Comercio a validar")
+        self.assertEqual(events.status_code, 403)
+
+    def test_validator_can_approve_an_application(self):
+        validator = Usuario.objects.create_user(
+            correo="validator-action@example.com", is_staff=True, is_validator=True
+        )
+        applicant = Usuario.objects.create_user(correo="applicant-action@example.com")
+        application = SolicitudMuestra.objects.create(
+            usuario=applicant,
+            estado=SolicitudMuestra.Estado.EN_REVISION,
+        )
+        self.client.force_login(validator)
+
+        response = self.client.post(
+            reverse("autenticacion:admin_applications"),
+            {"application_id": application.pk, "action": "approve", "observations": "Cumple."},
+        )
+
+        self.assertRedirects(response, reverse("autenticacion:admin_applications"))
+        application.refresh_from_db()
+        self.assertEqual(application.estado, SolicitudMuestra.Estado.APROBADA)
+        self.assertEqual(application.validada_por, validator)
+        self.assertIsNotNone(application.fecha_validacion)
+
+    def test_rejection_requires_observations(self):
+        validator = Usuario.objects.create_user(
+            correo="validator-reject@example.com", is_staff=True, is_validator=True
+        )
+        applicant = Usuario.objects.create_user(correo="applicant-reject@example.com")
+        application = SolicitudMuestra.objects.create(
+            usuario=applicant,
+            estado=SolicitudMuestra.Estado.EN_REVISION,
+        )
+        self.client.force_login(validator)
+
+        self.client.post(
+            reverse("autenticacion:admin_applications"),
+            {"application_id": application.pk, "action": "reject", "observations": ""},
+        )
+
+        application.refresh_from_db()
+        self.assertEqual(application.estado, SolicitudMuestra.Estado.EN_REVISION)

@@ -20,13 +20,20 @@ urlpatterns = [
     ),
     path(
         "administracion/usuarios/",
-        views.AdminCreateView.as_view(),
+        views.AdminUserListView.as_view(),
         name="admin_users",
     ),
+    path("administracion/usuarios/nuevo/", views.AdminUserCreateView.as_view(), name="admin_user_create"),
+    path("administracion/usuarios/<int:pk>/editar/", views.AdminUserUpdateView.as_view(), name="admin_user_update"),
     path(
         "administracion/eventos/",
         views.EventListView.as_view(),
         name="admin_events",
+    ),
+    path(
+        "administracion/solicitudes/",
+        views.ApplicationValidationView.as_view(),
+        name="admin_applications",
     ),
     path(
         "administracion/eventos/nuevo/",

@@ -1,41 +1,75 @@
 {% extends "layouts/admin.html" %}
 
-{% block title %}Usuarios administradores{% endblock %}
+{% block title %}Usuarios del sistema{% endblock %}
 
 {% block content %}
-  {% include "components/_page_header.html" with title="Usuarios administradores" subtitle="Registra cuentas con acceso al panel administrativo." %}
+  <div class="admin-page-heading">
+    {% include "components/_page_header.html" with title="Gestión de usuarios" subtitle="Administra usuarios, roles y accesos al panel." %}
+    <a href="{% url 'autenticacion:admin_user_create' %}" class="btn-primary">Agregar usuario</a>
+  </div>
 
-  <section class="ui-panel admin-create-panel">
-    <h2 class="admin-section-title">Dar de alta un administrador</h2>
-    <form method="post" class="form-stack" novalidate>
-      {% csrf_token %}
-      {% if form.non_field_errors %}
-        <div class="ui-alert ui-alert--error" role="alert">{{ form.non_field_errors.0 }}</div>
-      {% endif %}
-      {% include "components/_form_field.html" with field=form.nombre_visible %}
-      {% include "components/_form_field.html" with field=form.correo %}
-      {% include "components/_form_field.html" with field=form.password %}
-      {% include "components/_form_field.html" with field=form.password_confirmation %}
-      <div class="form-actions">
-        <button type="submit" class="btn-primary btn-lg">Crear administrador</button>
-      </div>
-    </form>
-  </section>
+  <div class="admin-user-stats admin-user-stats--four">
+    <div><span>Usuarios</span><strong>{{ users_count }}</strong></div>
+    <div><span>Administradores</span><strong>{{ admins_count }}</strong></div>
+    <div><span>Validadores</span><strong>{{ validators_count }}</strong></div>
+    <div><span>Activos</span><strong>{{ active_count }}</strong></div>
+  </div>
 
-  <section class="ui-panel admin-list-panel">
-    <h2 class="admin-section-title">Administradores registrados</h2>
-    <div class="admin-user-list">
-      {% for admin in admin_users %}
-        <article class="admin-user-row">
-          <div>
-            <p class="admin-user-row__name">{{ admin.nombre_visible|default:"Sin nombre" }}</p>
-            <p class="admin-user-row__email">{{ admin.correo }}</p>
-          </div>
-          <span class="admin-user-row__status">{% if admin.is_active %}Activo{% else %}Inactivo{% endif %}</span>
-        </article>
-      {% empty %}
-        <p>No hay administradores registrados.</p>
-      {% endfor %}
+  {{ user_table_items|json_script:"user-table-items" }}
+  <section class="ui-panel" x-data="userTable(JSON.parse(document.getElementById('user-table-items').textContent), {{ reset_user_id|default:'null' }})">
+    <div class="admin-table-toolbar">
+      <div><h2 class="admin-section-title">Usuarios registrados</h2><p><strong x-text="filteredItems.length"></strong> resultado<span x-show="filteredItems.length !== 1">s</span></p></div>
+      <label class="admin-table-search"><span class="sr-only">Buscar usuarios</span><input type="search" class="form-input" x-model.debounce.250ms="search" @input="page = 1" placeholder="Buscar por nombre o correo" /></label>
+    </div>
+
+    <div class="admin-table-scroll">
+      <table class="admin-data-table admin-users-table">
+        <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Registro</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+        <tbody>
+          {% for account in all_users %}
+            <tr x-show="visibleIds.includes({{ account.pk }})" x-cloak>
+              <td><div class="admin-table-user"><span>{{ account.nombre_visible|default:"U"|first|upper }}</span><div><strong>{{ account.nombre_visible|default:"Sin nombre" }}</strong><p>{{ account.correo }}</p></div></div></td>
+              <td><span class="admin-role-badge">{% if account.is_superuser %}Superadministrador{% elif account.is_validator %}Validador{% elif account.is_staff %}Administrador{% else %}Expositor{% endif %}</span></td>
+              <td><span class="admin-user-row__status {% if not account.is_active %}is-hidden{% endif %}">{% if account.is_active %}Activo{% else %}Inactivo{% endif %}</span></td>
+              <td class="admin-table-muted">{{ account.fecha_registro|date:"d/m/Y" }}</td>
+              <td>
+                <div class="admin-table-actions admin-table-actions--wrap">
+                  <a class="btn-outline" href="{% url 'autenticacion:admin_user_update' account.pk %}">Editar</a>
+                  {% if not account.is_superuser %}
+                  <form method="post">{% csrf_token %}<input type="hidden" name="user_id" value="{{ account.pk }}" /><input type="hidden" name="action" value="toggle_active" /><button class="btn-outline" type="submit">{% if account.is_active %}Desactivar{% else %}Activar{% endif %}</button></form>
+                  {% endif %}
+                </div>
+                {% if account.is_staff %}<button type="button" class="admin-table-password" @click="openPassword({ id: {{ account.pk }}, email: '{{ account.correo|escapejs }}' })">Restablecer contraseña</button>{% endif %}
+              </td>
+            </tr>
+          {% empty %}<tr><td colspan="5"><div class="admin-empty-state"><p>No hay usuarios registrados.</p></div></td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="admin-table-empty" x-show="items.length && !filteredItems.length" x-cloak>No hay usuarios que coincidan con la búsqueda.</div>
+    <footer class="admin-table-pagination" x-show="filteredItems.length"><p>Mostrando <strong x-text="start + 1"></strong>–<strong x-text="Math.min(end, filteredItems.length)"></strong> de <strong x-text="filteredItems.length"></strong></p><div><button type="button" class="btn-outline" :disabled="page === 1" @click="page--">Anterior</button><span>Página <strong x-text="page"></strong> de <strong x-text="totalPages"></strong></span><button type="button" class="btn-outline" :disabled="page === totalPages" @click="page++">Siguiente</button></div></footer>
+
+    <div class="admin-modal-backdrop" x-show="resetOpen" x-cloak @keydown.escape.window="resetOpen = false" @click.self="resetOpen = false">
+      <section class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="reset-password-title">
+        <div class="admin-modal__header"><div><h2 id="reset-password-title">Restablecer contraseña</h2><p x-text="resetUser ? resetUser.email : ''"></p></div><button type="button" class="btn-outline" @click="resetOpen = false">Cerrar</button></div>
+        <form method="post" class="form-stack">{% csrf_token %}<input type="hidden" name="action" value="reset_password" /><input type="hidden" name="user_id" :value="resetUser ? resetUser.id : ''" />
+          <label class="form-field"><span class="form-label">Nueva contraseña</span><input class="form-input" type="password" name="password" autocomplete="new-password" required /></label>
+          <label class="form-field"><span class="form-label">Confirmar contraseña</span><input class="form-input" type="password" name="password_confirmation" autocomplete="new-password" required /></label>
+          {% if reset_user_id %}{% for field in reset_form %}{% for error in field.errors %}<p class="form-error">{{ error }}</p>{% endfor %}{% endfor %}{% endif %}
+          <div class="form-actions"><button type="button" class="btn-outline" @click="resetOpen = false">Cancelar</button><button type="submit" class="btn-primary">Actualizar contraseña</button></div>
+        </form>
+      </section>
     </div>
   </section>
 {% endblock content %}
+
+{% block extra_js %}<script>
+  document.addEventListener('alpine:init', () => Alpine.data('userTable', (items, resetId) => ({
+    items, search: '', page: 1, pageSize: 10, resetOpen: Boolean(resetId), resetUser: items.find(item => item.id === resetId) || null,
+    openPassword(user) { this.resetUser = user; this.resetOpen = true; },
+    get filteredItems() { const term = this.search.trim().toLowerCase(); return term ? this.items.filter(item => item.search.includes(term)) : this.items; },
+    get totalPages() { return Math.max(1, Math.ceil(this.filteredItems.length / this.pageSize)); },
+    get start() { return (this.page - 1) * this.pageSize; }, get end() { return this.start + this.pageSize; },
+    get visibleIds() { return this.filteredItems.slice(this.start, this.end).map(item => item.id); }
+  })));
+</script>{% endblock extra_js %}

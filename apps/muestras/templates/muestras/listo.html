@@ -1,9 +1,16 @@
 {% extends "layouts/app.html" %}
 
 {% block title %}Solicitud enviada — {{ evento_nombre }}{% endblock %}
+{% block content_class %}app-content--application{% endblock %}
 
 {% block content %}
   {% include "components/_page_header.html" with title="Solicitud completada" subtitle=evento_nombre %}
+
+  <div class="ui-alert {% if solicitud.estado == 'RECHAZADA' %}ui-alert--error{% else %}ui-alert--success{% endif %}" role="status">
+    <strong>Estado: {{ solicitud.get_estado_display }}</strong>
+    {% if solicitud.estado == 'EN_REVISION' %}<p>Tu solicitud fue enviada y será revisada por un validador.</p>{% endif %}
+    {% if solicitud.observaciones_validacion %}<p>{{ solicitud.observaciones_validacion }}</p>{% endif %}
+  </div>
 
   <section class="ui-panel">
     <div class="doc-card__head">

@@ -74,6 +74,7 @@ def _datos_globales(user):
     obligatorios_pendientes = sum(
         1 for item in documentos if item["tipo"].obligatorio and not item["version"]
     )
+    documentos_vencidos = sum(1 for item in documentos if item["estado"] == "VENCIDO")
     return {
         "tipo_persona": expediente.get_tipo_persona_display() if expediente.tipo_persona else "—",
         "campos": campos,
@@ -82,6 +83,8 @@ def _datos_globales(user):
         "documentos_cargados": cargados,
         "documentos_porcentaje": round(cargados * 100 / len(documentos)) if documentos else 100,
         "documentos_obligatorios_pendientes": obligatorios_pendientes,
+        "documentos_vencidos": documentos_vencidos,
+        "puede_continuar": documentos_vencidos == 0,
     }
 
 
@@ -123,21 +126,38 @@ class Paso1View(LoginRequiredMixin, FormView):
         context["evento_info"] = EVENTO_INFO
         context["datos_globales"] = _datos_globales(self.request.user)
         context["comercio"] = getattr(self.request.user.expediente, "comercio", None)
+        form = context.get("form")
+        catalog_error = bool(form and form.is_bound and (
+            any(
+                name == "producto_principal" or name.startswith(("product_", "furniture_"))
+                for name in form.errors
+            )
+            or any("producto" in str(error).lower() for error in form.non_field_errors())
+        ))
+        context["application_wizard_step"] = 3 if catalog_error else (2 if form and form.is_bound else 1)
         return context
 
     def form_valid(self, form):
+        datos_globales = _datos_globales(self.request.user)
+        if datos_globales and not datos_globales["puede_continuar"]:
+            messages.error(
+                self.request,
+                "Actualiza los documentos vencidos y registra su nueva vigencia antes de continuar.",
+            )
+            return redirect("muestras:paso1")
         comercio = getattr(self.request.user.expediente, "comercio", None)
         if comercio is None:
             form.add_error(None, "Registra primero la información de tu comercio en Mi perfil.")
             return self.form_invalid(form)
         try:
-            productos, mobiliario = form.participation_details()
+            productos, mobiliario, equipos = form.participation_details()
             guardar_paso1(
                 self.solicitud,
                 form.cleaned_data,
                 nombre_comercio=comercio.nombre,
                 productos=productos,
                 mobiliario=mobiliario,
+                equipos_dinamicos=equipos,
             )
         except ValidationError as exc:
             if hasattr(exc, "message_dict"):

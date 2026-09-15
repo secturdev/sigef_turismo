@@ -7,6 +7,10 @@
   <section class="ui-panel admin-summary">
     <p class="admin-summary__label">Administradores registrados</p>
     <p class="admin-summary__value">{{ admin_count }}</p>
-    <a href="{% url 'autenticacion:admin_users' %}" class="btn-primary">Dar de alta un administrador</a>
+    {% if request.user.is_superuser %}<a href="{% url 'autenticacion:admin_users' %}" class="btn-primary">Gestionar usuarios</a>{% endif %}
   </section>
+  {% if request.user.is_validator or request.user.is_superuser %}<section class="ui-panel admin-summary">
+    <p class="admin-summary__label">Solicitudes pendientes de validación</p><p class="admin-summary__value">{{ pending_applications }}</p>
+    <a href="{% url 'autenticacion:admin_applications' %}" class="btn-primary">Abrir bandeja</a>
+  </section>{% endif %}
 {% endblock content %}

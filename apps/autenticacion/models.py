@@ -31,6 +31,7 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
         "OIDC sub", max_length=255, blank=True, null=True, unique=True
     )
     is_staff = models.BooleanField(default=False)
+    is_validator = models.BooleanField("es validador", default=False)
     is_active = models.BooleanField(default=True)
     fecha_registro = models.DateTimeField(default=timezone.now)
 

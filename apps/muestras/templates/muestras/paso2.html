@@ -1,12 +1,13 @@
 {% extends "layouts/app.html" %}
 
 {% block title %}Documentos — {{ evento_nombre }}{% endblock %}
+{% block content_class %}app-content--application{% endblock %}
 
 {% block content %}
   {% include "muestras/_steps.html" with step=step %}
   {% include "components/_page_header.html" with title="Documentos del comercio" subtitle=evento_nombre %}
 
-  <form method="post" enctype="multipart/form-data" novalidate>
+  <form method="post" enctype="multipart/form-data" class="application-media-form" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}
       <div class="ui-alert ui-alert--error mb-5">
