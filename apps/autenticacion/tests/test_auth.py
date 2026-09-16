@@ -114,12 +114,8 @@ class AuthTests(TestCase):
         self.assertEqual(giro_response.json()["criterio"]["tipo"], "GIRO_SUBGIRO")
         self.assertEqual(
             {item["asiento_id"] for item in giro_response.json()["espacios"]},
-            {"100", "300"},
+            {"100"},
         )
-        section_space = next(
-            item for item in giro_response.json()["espacios"] if item["asiento_id"] == "300"
-        )
-        self.assertEqual(section_space["capacidad_seccion"], 10)
         self.assertEqual(folio_response.json()["criterio"]["tipo"], "FOLIO")
         self.assertTrue(folio_response.json()["criterio"]["folio_valido"])
         self.assertEqual(folio_response.json()["espacios"][0]["asiento_id"], "200")
@@ -694,6 +690,13 @@ class AuthTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["sections"][0]["id"], 376)
+        disabled_response = self.client.post(
+            reverse("autenticacion:admin_event_sections_data", args=[event.pk]),
+            {"boletab_evento_id": "61", "seccion_id": "376", "reglas_json": "[]"},
+        )
+        self.assertEqual(disabled_response.status_code, 405)
+        self.assertIn("cada stand", disabled_response.json()["error"])
+        return
 
         with (
             patch(

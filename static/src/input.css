@@ -22,7 +22,7 @@
   }
 
   [x-cloak] {
-    @apply hidden !;
+    display: none !important;
   }
 }
 
@@ -917,7 +917,7 @@
   }
 
   .event-basic-layout {
-    @apply grid gap-6 lg:grid-cols-[minmax(0, 1fr)_20rem];
+    @apply grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem];
   }
 
   .event-basic-fields {
@@ -941,7 +941,7 @@
   }
 
   .event-document-grid {
-    @apply mt-4 grid gap-4 md:grid-cols-[minmax(0, 1fr)_10rem];
+    @apply mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem];
   }
 
   .event-global-documents {
@@ -1500,7 +1500,7 @@
   }
 
   .space-map-layout {
-    @apply grid min-h-[68vh] lg:grid-cols-[minmax(0, 1fr)_30rem];
+    @apply grid min-h-[68vh] lg:grid-cols-[minmax(0,1fr)_30rem];
   }
 
   .space-template-warning {
@@ -1521,6 +1521,14 @@
 
   .space-map-canvas {
     @apply relative flex min-h-[60vh] items-center justify-center overflow-hidden bg-secondary-100 p-3 sm:p-6;
+  }
+
+  .space-map-selection-actions {
+    @apply ml-auto flex flex-wrap justify-end gap-2;
+  }
+
+  .space-map-selection-actions .btn-outline {
+    @apply bg-white px-3 py-2 text-xs;
   }
 
   .space-map {

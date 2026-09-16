@@ -1,10 +1,35 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from django.utils import timezone
 
 from apps.landingpage.boletab import get_boletab_places
 from apps.landingpage.models import Evento, ReglaEspacio
 from apps.muestras.models import SolicitudMuestra
+
+
+def _reconcile_live_spaces(event: Evento, places_by_event: dict[str, list[dict]]) -> None:
+    """Fail closed when a saved stand no longer represents the same Boletab stand."""
+    checked_at = timezone.now()
+    for rule in event.reglas_espacios.all():
+        live_places = {
+            str(place.get("asientoId")): place
+            for place in places_by_event.get(rule.boletab_evento_id, [])
+        }
+        place = live_places.get(rule.asiento_id)
+        current_section = str(place.get("seccionId") or "") if place else ""
+        current_label = str(place.get("etiqueta") or "") if place else ""
+        if place is None:
+            status = ReglaEspacio.EstadoPlantilla.AUSENTE
+        elif rule.boletab_seccion_id and rule.boletab_seccion_id != current_section:
+            status = ReglaEspacio.EstadoPlantilla.MODIFICADO
+        elif rule.etiqueta and current_label and rule.etiqueta != current_label:
+            status = ReglaEspacio.EstadoPlantilla.MODIFICADO
+        else:
+            status = ReglaEspacio.EstadoPlantilla.VIGENTE
+        rule.estado_plantilla = status
+        rule.ultima_validacion = checked_at
+        rule.save(update_fields=("estado_plantilla", "ultima_validacion"))
 
 
 def _matches_giro(rule: ReglaEspacio, solicitud: SolicitudMuestra) -> bool:
@@ -19,9 +44,7 @@ def _matches_folio(rule: ReglaEspacio, folio: str) -> bool:
     return folio in rule.folios
 
 
-def _serialize_place(
-    place: dict, boletab_event_id: str, access_type: str, section_capacity=None
-) -> dict:
+def _serialize_place(place: dict, boletab_event_id: str, access_type: str) -> dict:
     result = {
         "boletab_evento_id": boletab_event_id,
         "asiento_id": str(place.get("asientoId")),
@@ -36,8 +59,6 @@ def _serialize_place(
         "habilitado": bool(place.get("habilitado")),
         "tipo_acceso": access_type,
     }
-    if section_capacity is not None:
-        result["capacidad_seccion"] = section_capacity
     return result
 
 
@@ -50,6 +71,12 @@ def available_spaces_for_application(
     uses_folio = bool(folio)
     valid_folio = folio in event_folios if uses_folio else None
     access_type = "FOLIO" if uses_folio else "GIRO_SUBGIRO"
+
+    places_by_event = {
+        str(linked_event["id"]): get_boletab_places(str(linked_event["id"]))
+        for linked_event in event.boletab_eventos
+    }
+    _reconcile_live_spaces(event, places_by_event)
 
     rules: Iterable[ReglaEspacio] = event.reglas_espacios.filter(
         estado_plantilla=ReglaEspacio.EstadoPlantilla.VIGENTE
@@ -66,45 +93,21 @@ def available_spaces_for_application(
     for rule in allowed_rules:
         rules_by_event.setdefault(rule.boletab_evento_id, set()).add(rule.asiento_id)
 
-    explicit_rules = {
-        (rule.boletab_evento_id, rule.asiento_id) for rule in all_rules
-    }
-    section_capacities = {}
-    if not uses_folio:
-        for section_rule in event.reglas_secciones.all():
-            for item in section_rule.reglas:
-                if (
-                    item.get("giro") == solicitud.giro
-                    and item.get("subgiro") == solicitud.subgiro
-                ):
-                    section_capacities[
-                        (section_rule.boletab_evento_id, section_rule.seccion_id)
-                    ] = item["cantidad"]
-
     result = []
     for linked_event in event.boletab_eventos:
         boletab_event_id = str(linked_event["id"])
         allowed_ids = rules_by_event.get(boletab_event_id, set())
-        has_section_rules = any(key[0] == boletab_event_id for key in section_capacities)
-        if not allowed_ids and not has_section_rules:
+        if not allowed_ids:
             continue
-        for place in get_boletab_places(boletab_event_id):
+        for place in places_by_event.get(boletab_event_id, []):
             asiento_id = str(place.get("asientoId"))
-            section_key = (boletab_event_id, str(place.get("seccionId")))
-            has_explicit_rule = (boletab_event_id, asiento_id) in explicit_rules
             allowed_by_space = asiento_id in allowed_ids
-            allowed_by_section = not has_explicit_rule and section_key in section_capacities
-            if not allowed_by_space and not allowed_by_section:
+            if not allowed_by_space:
                 continue
             if place.get("estado") != "DISPONIBLE" or not place.get("habilitado"):
                 continue
             result.append(
-                _serialize_place(
-                    place,
-                    boletab_event_id,
-                    access_type,
-                    section_capacities.get(section_key) if allowed_by_section else None,
-                )
+                _serialize_place(place, boletab_event_id, access_type)
             )
 
     return access_type, folio if uses_folio else None, valid_folio, result

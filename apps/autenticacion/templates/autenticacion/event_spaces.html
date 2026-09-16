@@ -42,6 +42,11 @@
       <button type="button" class="btn-outline space-simulation-button" x-show="simulationActive"
         @click="stopTemplateSimulation()">Salir de simulación</button>
     {% endif %}
+    <div class="space-map-selection-actions" x-show="placeList.length">
+      <button type="button" class="btn-outline" @click="selectAllPlaces()"
+        :disabled="selectedIds.length === placeList.length">Seleccionar todos</button>
+      <button type="button" class="btn-outline" x-show="selectedIds.length" @click="clearSelection()">Limpiar selección</button>
+    </div>
     <!-- <div class="space-toolbar__summary">
       Total: <strong x-text="placeList.length"></strong> espacios ·
       <strong x-text="configuredCount"></strong> configurados
@@ -49,7 +54,7 @@
   </div>
 
   <div class="space-config-layout">
-  <aside class="section-capacity">
+  <aside class="section-capacity" hidden aria-hidden="true">
     <div class="section-capacity__bar">
       <div>
         <h3>Capacidad por giro y subgiro de la sección</h3>
@@ -143,7 +148,7 @@
           </svg>
         </button>
       </div>
-      <p class="space-map-hint">Haz clic para seleccionar varios espacios · Rueda para zoom · Arrastra para moverte</p>
+      <p class="space-map-hint">Clic: seleccionar uno · Ctrl + clic izquierdo: selección múltiple · Rueda: zoom · Arrastra: mover</p>
       <svg class="space-map" x-show="placeList.length" :class="{ 'is-panning': panning }"
         x-effect="$el.setAttribute('viewBox', currentViewBox)" preserveAspectRatio="xMidYMid meet"
         aria-label="Mapa de espacios" @wheel.prevent="wheelZoom($event)" @pointerdown="startPan($event)"
@@ -299,7 +304,7 @@
                 :disabled="clearing" @click="confirmingClear = true">Quitar configuración individual</button>
               <div class="space-rule-builder" x-show="selectedSpacesHaveIndividualRules && confirmingClear">
                 <p class="form-help"
-                  x-text="`¿Quitar la configuración individual de ${selectedIds.filter(id => places[id]?.rules.configured).length} stand${selectedIds.filter(id => places[id]?.rules.configured).length === 1 ? '' : 's'}? Después heredará las reglas globales de la sección.`"></p>
+                  x-text="`¿Quitar la configuración de ${selectedIds.filter(id => places[id]?.rules.configured).length} stand${selectedIds.filter(id => places[id]?.rules.configured).length === 1 ? '' : 's'}? El stand quedará sin reglas de acceso.`"></p>
                 <div class="space-rule-row">
                   <button type="button" class="btn-outline" :disabled="clearing"
                     @click="confirmingClear = false">Cancelar</button>
@@ -522,7 +527,7 @@
           this.sectionSaving = false;
         }
       },
-      selectPlace(id) {
+      selectPlace(id, multiple = false) {
         this.confirmingClear = false;
         if (this.panMoved) {
           this.panMoved = false;
@@ -530,6 +535,12 @@
         }
         const normalizedId = String(id);
         const place = this.places[normalizedId];
+        if (!place) return;
+        if (!multiple) {
+          this.selectedIds = [normalizedId];
+          this.setSelectedPlace(place);
+          return;
+        }
         const existingIndex = this.selectedIds.indexOf(normalizedId);
         if (existingIndex >= 0) {
           this.selectedIds.splice(existingIndex, 1);
@@ -564,7 +575,17 @@
       },
       selectPlaceFromEvent(event) {
         const element = event.target.closest('[data-space-id]');
-        if (element) this.selectPlace(element.dataset.spaceId);
+        if (element) this.selectPlace(element.dataset.spaceId, Boolean(event.ctrlKey));
+      },
+      selectAllPlaces() {
+        this.confirmingClear = false;
+        this.selectedIds = this.placeList.map(place => String(place.asientoId));
+        if (this.placeList.length) this.setSelectedPlace(this.placeList[0]);
+      },
+      clearSelection() {
+        this.confirmingClear = false;
+        this.selectedIds = [];
+        this.selected = null;
       },
       addRule() {
         if (!this.hasFolios) this.selected.rules.reglas.push({ giro: '', subgiro: '' });

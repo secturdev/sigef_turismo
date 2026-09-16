@@ -21,9 +21,9 @@ from mozilla_django_oidc.views import (
     OIDCLogoutView,
 )
 
-from .forms import AdminCreateForm, AdminLoginForm, AdminPasswordResetForm, AdminUserUpdateForm, EventCreateForm, SectionRuleForm, SpaceRuleForm
+from .forms import AdminCreateForm, AdminLoginForm, AdminPasswordResetForm, AdminUserUpdateForm, EventCreateForm, SpaceRuleForm
 from .models import Usuario
-from apps.landingpage.models import Evento, ReglaEspacio, ReglaSeccion
+from apps.landingpage.models import Evento, ReglaEspacio
 from apps.expediente.models import TipoDocumento
 from apps.muestras.constants import GIROS, SUBGIROS, SUBGIROS_POR_GIRO
 from apps.muestras.models import SolicitudMuestra
@@ -621,46 +621,6 @@ class EventSpacesView(UserPassesTestMixin, TemplateView):
         if invalid_ids:
             return error_response("Uno o más espacios no pertenecen al evento.")
 
-        existing_individual_ids = set(
-            ReglaEspacio.objects.filter(
-                evento=self.event,
-                boletab_evento_id=data["boletab_evento_id"],
-            ).values_list("asiento_id", flat=True)
-        )
-        places_by_section: dict[str, set[str]] = {}
-        for place_id, place in valid_places.items():
-            section_id = str(place.get("seccionId") or "")
-            places_by_section.setdefault(section_id, set()).add(place_id)
-        selected_ids = set(data["asiento_ids_json"])
-        selected_sections = {
-            str(valid_places[place_id].get("seccionId") or "")
-            for place_id in selected_ids
-        }
-        section_rules = {
-            rule.seccion_id: rule
-            for rule in ReglaSeccion.objects.filter(
-                evento=self.event,
-                boletab_evento_id=data["boletab_evento_id"],
-                seccion_id__in=selected_sections,
-            )
-        }
-        for section_id, section_rule in section_rules.items():
-            section_place_ids = places_by_section.get(section_id, set())
-            individual_count = len(
-                section_place_ids & (existing_individual_ids | selected_ids)
-            )
-            global_limit = max(len(section_place_ids) - individual_count, 0)
-            allocated = sum(
-                int(item.get("cantidad") or 0) for item in section_rule.reglas
-            )
-            if allocated > global_limit:
-                return error_response(
-                    "No puedes configurar este stand individualmente porque la "
-                    f"sección tiene {allocated} lugares asignados globalmente y, "
-                    f"con este cambio, solo quedarían {global_limit}. Reduce primero "
-                    "la capacidad global de la sección."
-                )
-
         giros = list(dict.fromkeys(rule["giro"] for rule in data["reglas_json"]))
         subgiros = list(
             dict.fromkeys(
@@ -759,17 +719,6 @@ class EventSpacesDataView(UserPassesTestMixin, View):
             if rule:
                 configured_count += 1
 
-        global_capacity = max(len(places) - configured_count, 0)
-        section_rule = ReglaSeccion.objects.filter(
-            evento=event,
-            boletab_evento_id=boletab_event_id,
-            seccion_id=request.GET.get("seccion", ""),
-        ).first()
-        allocated_capacity = sum(
-            int(item.get("cantidad") or 0)
-            for item in (section_rule.reglas if section_rule else [])
-        )
-
         coordinates = [point for place in places for point in place["coordinates"]]
         if coordinates:
             xs = [point[0] for point in coordinates]
@@ -788,13 +737,6 @@ class EventSpacesDataView(UserPassesTestMixin, View):
             {
                 "places": places,
                 "configured_count": configured_count,
-                "section_capacity": {
-                    "total_spaces": len(places),
-                    "individual_spaces": configured_count,
-                    "global_limit": global_capacity,
-                    "allocated": allocated_capacity,
-                    "remaining": max(global_capacity - allocated_capacity, 0),
-                },
                 "view_box": view_box,
                 "template_warnings": template_warnings,
             }
@@ -819,17 +761,15 @@ class EventSectionsDataView(UserPassesTestMixin, View):
             sections = get_boletab_sections(boletab_event_id)
         except BoletabError as exc:
             return JsonResponse({"error": str(exc)}, status=502)
-        saved_rules = {
-            rule.seccion_id: rule.reglas
-            for rule in ReglaSeccion.objects.filter(
-                evento=event, boletab_evento_id=boletab_event_id
-            )
-        }
-        for section in sections:
-            section["capacity_rules"] = saved_rules.get(str(section["id"]), [])
         return JsonResponse({"sections": sections})
 
     def post(self, request, pk):
+        return JsonResponse(
+            {"error": "La configuración por sección ya no está disponible. Configura cada stand individualmente."},
+            status=405,
+        )
+        # Código histórico inaccesible; se conserva temporalmente para facilitar
+        # la migración de datos existentes antes de retirar el modelo.
         event = get_object_or_404(Evento, pk=pk)
         form = SectionRuleForm(request.POST, catalog=event.catalogo_giros)
         if not form.is_valid():
